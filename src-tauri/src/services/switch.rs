@@ -23,7 +23,8 @@ impl SwitchService {
         let conn = db.lock().map_err(|e| e.to_string())?;
 
         // Check if this is the first provider for this app type
-        let existing = ProviderDao::get_all(&conn, &provider.app_type).map_err(|e| e.to_string())?;
+        let existing =
+            ProviderDao::get_all(&conn, &provider.app_type).map_err(|e| e.to_string())?;
         let is_first = existing.is_empty();
 
         ProviderDao::insert(&conn, &provider).map_err(|e| e.to_string())?;
@@ -36,7 +37,7 @@ impl SwitchService {
             if let Ok(app_type_enum) = provider.app_type.parse::<AppType>() {
                 if app_type_enum != AppType::ProxyCast {
                     live_sync::sync_to_live(&app_type_enum, &provider)
-                        .map_err(|e| format!("Failed to sync: {}", e))?;
+                        .map_err(|e| format!("Failed to sync: {e}"))?;
                 }
             }
         }
@@ -48,8 +49,12 @@ impl SwitchService {
         let conn = db.lock().map_err(|e| e.to_string())?;
 
         // Check if this is the current provider
-        let current = ProviderDao::get_current(&conn, &provider.app_type).map_err(|e| e.to_string())?;
-        let is_current = current.as_ref().map(|p| p.id == provider.id).unwrap_or(false);
+        let current =
+            ProviderDao::get_current(&conn, &provider.app_type).map_err(|e| e.to_string())?;
+        let is_current = current
+            .as_ref()
+            .map(|p| p.id == provider.id)
+            .unwrap_or(false);
 
         ProviderDao::update(&conn, &provider).map_err(|e| e.to_string())?;
 
@@ -58,7 +63,7 @@ impl SwitchService {
             if let Ok(app_type_enum) = provider.app_type.parse::<AppType>() {
                 if app_type_enum != AppType::ProxyCast {
                     live_sync::sync_to_live(&app_type_enum, &provider)
-                        .map_err(|e| format!("Failed to sync: {}", e))?;
+                        .map_err(|e| format!("Failed to sync: {e}"))?;
                 }
             }
         }
@@ -86,15 +91,15 @@ impl SwitchService {
         // Get target provider
         let target_provider = ProviderDao::get_by_id(&conn, app_type, id)
             .map_err(|e| e.to_string())?
-            .ok_or_else(|| format!("Provider not found: {}", id))?;
+            .ok_or_else(|| format!("Provider not found: {id}"))?;
 
         let app_type_enum = app_type.parse::<AppType>().map_err(|e| e.to_string())?;
 
         // Skip backfill and sync for ProxyCast
         if app_type_enum != AppType::ProxyCast {
             // Backfill: Read current live config and save to current provider
-            if let Some(current_provider) = ProviderDao::get_current(&conn, app_type)
-                .map_err(|e| e.to_string())?
+            if let Some(current_provider) =
+                ProviderDao::get_current(&conn, app_type).map_err(|e| e.to_string())?
             {
                 // Only backfill if switching to a different provider
                 if current_provider.id != id {
@@ -114,7 +119,7 @@ impl SwitchService {
         // Sync target provider to live config
         if app_type_enum != AppType::ProxyCast {
             live_sync::sync_to_live(&app_type_enum, &target_provider)
-                .map_err(|e| format!("Failed to sync: {}", e))?;
+                .map_err(|e| format!("Failed to sync: {e}"))?;
         }
 
         Ok(())
@@ -139,7 +144,7 @@ impl SwitchService {
 
         // Read live settings
         let live_settings = live_sync::read_live_settings(&app_type_enum)
-            .map_err(|e| format!("Failed to read live settings: {}", e))?;
+            .map_err(|e| format!("Failed to read live settings: {e}"))?;
 
         // Create default provider
         let provider = Provider {

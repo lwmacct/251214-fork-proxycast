@@ -11,7 +11,8 @@
       "Bash(tree:*)",
       "Bash(find:*)",
       "Bash(cargo check:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cargo clippy:*)"
     ],
     "deny": [],
     "ask": []

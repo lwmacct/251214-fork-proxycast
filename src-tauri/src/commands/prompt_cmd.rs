@@ -42,30 +42,19 @@ pub fn update_prompt(db: State<'_, DbConnection>, prompt: Prompt) -> Result<(), 
 
 /// Delete a prompt
 #[tauri::command]
-pub fn delete_prompt(
-    db: State<'_, DbConnection>,
-    app: String,
-    id: String,
-) -> Result<(), String> {
+pub fn delete_prompt(db: State<'_, DbConnection>, app: String, id: String) -> Result<(), String> {
     PromptService::delete(&db, &app, &id)
 }
 
 /// Enable a prompt and sync to live file
 #[tauri::command]
-pub fn enable_prompt(
-    db: State<'_, DbConnection>,
-    app: String,
-    id: String,
-) -> Result<(), String> {
+pub fn enable_prompt(db: State<'_, DbConnection>, app: String, id: String) -> Result<(), String> {
     PromptService::enable(&db, &app, &id)
 }
 
 /// Import prompt from live file
 #[tauri::command]
-pub fn import_prompt_from_file(
-    db: State<'_, DbConnection>,
-    app: String,
-) -> Result<String, String> {
+pub fn import_prompt_from_file(db: State<'_, DbConnection>, app: String) -> Result<String, String> {
     PromptService::import_from_file(&db, &app)
 }
 

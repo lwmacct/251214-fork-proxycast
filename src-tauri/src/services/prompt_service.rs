@@ -14,7 +14,10 @@ impl PromptService {
     }
 
     /// Get all prompts as a HashMap (for frontend)
-    pub fn get_all_map(db: &DbConnection, app_type: &str) -> Result<HashMap<String, Prompt>, String> {
+    pub fn get_all_map(
+        db: &DbConnection,
+        app_type: &str,
+    ) -> Result<HashMap<String, Prompt>, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         PromptDao::get_all_map(&conn, app_type).map_err(|e| e.to_string())
     }
@@ -48,7 +51,10 @@ impl PromptService {
 
         // If this prompt is enabled, sync to live file
         if prompt.enabled {
-            let app = prompt.app_type.parse::<AppType>().map_err(|e| e.to_string())?;
+            let app = prompt
+                .app_type
+                .parse::<AppType>()
+                .map_err(|e| e.to_string())?;
             prompt_sync::write_live_prompt(&app, &prompt.content)?;
         }
 
@@ -95,13 +101,15 @@ impl PromptService {
                 } else {
                     // No enabled prompt, check if we should create a backup
                     let prompts = PromptDao::get_all(&conn, app_type).map_err(|e| e.to_string())?;
-                    let content_exists = prompts.iter().any(|p| p.content.trim() == live_content.trim());
+                    let content_exists = prompts
+                        .iter()
+                        .any(|p| p.content.trim() == live_content.trim());
 
                     if !content_exists {
                         // Create a backup prompt
                         let timestamp = chrono::Utc::now().timestamp();
                         let backup = Prompt {
-                            id: format!("backup-{}", timestamp),
+                            id: format!("backup-{timestamp}"),
                             app_type: app_type.to_string(),
                             name: format!(
                                 "Original Prompt {}",
@@ -157,7 +165,7 @@ impl PromptService {
         }
 
         let timestamp = chrono::Utc::now().timestamp();
-        let id = format!("imported-{}", timestamp);
+        let id = format!("imported-{timestamp}");
 
         let prompt = Prompt {
             id: id.clone(),
@@ -206,7 +214,7 @@ impl PromptService {
 
         let timestamp = chrono::Utc::now().timestamp();
         let prompt = Prompt {
-            id: format!("auto-imported-{}", timestamp),
+            id: format!("auto-imported-{timestamp}"),
             app_type: app_type.to_string(),
             name: format!(
                 "Auto-imported {}",

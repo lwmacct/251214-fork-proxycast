@@ -90,13 +90,12 @@ impl McpDao {
             "gemini" => "enabled_gemini",
             _ => {
                 return Err(rusqlite::Error::InvalidParameterName(format!(
-                    "Invalid app_type: {}",
-                    app_type
+                    "Invalid app_type: {app_type}"
                 )))
             }
         };
 
-        let sql = format!("UPDATE mcp_servers SET {} = ? WHERE id = ?", column);
+        let sql = format!("UPDATE mcp_servers SET {column} = ? WHERE id = ?");
         conn.execute(&sql, params![if enabled { 1 } else { 0 }, id])?;
         Ok(())
     }

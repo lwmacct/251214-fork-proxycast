@@ -61,7 +61,7 @@ pub fn get_config_dir_path(app_type: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn open_config_folder(handle: AppHandle, app_type: String) -> Result<bool, String> {
+pub async fn open_config_folder(_handle: AppHandle, app_type: String) -> Result<bool, String> {
     let app = app_type.parse::<AppType>().map_err(|e| e.to_string())?;
     let config_dir = get_config_dir(&app).ok_or("Cannot determine config directory")?;
 
@@ -175,7 +175,7 @@ pub async fn get_auto_launch_status(app: AppHandle) -> Result<bool, String> {
     let autostart_manager = app.autolaunch();
     autostart_manager
         .is_enabled()
-        .map_err(|e| format!("Failed to get autostart status: {}", e))
+        .map_err(|e| format!("Failed to get autostart status: {e}"))
 }
 
 #[tauri::command]
@@ -185,11 +185,11 @@ pub async fn set_auto_launch(app: AppHandle, enabled: bool) -> Result<bool, Stri
     if enabled {
         autostart_manager
             .enable()
-            .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+            .map_err(|e| format!("Failed to enable autostart: {e}"))?;
     } else {
         autostart_manager
             .disable()
-            .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+            .map_err(|e| format!("Failed to disable autostart: {e}"))?;
     }
 
     Ok(enabled)

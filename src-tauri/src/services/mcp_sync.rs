@@ -108,14 +108,14 @@ fn sync_mcp_to_codex(
     std::fs::create_dir_all(&codex_dir)?;
 
     // Read existing config
-    let mut existing_content = if config_path.exists() {
+    let existing_content = if config_path.exists() {
         std::fs::read_to_string(&config_path)?
     } else {
         String::new()
     };
 
     // Remove existing [mcp_servers.*] sections
-    let mut lines: Vec<&str> = existing_content.lines().collect();
+    let lines: Vec<&str> = existing_content.lines().collect();
     let mut new_lines: Vec<String> = Vec::new();
     let mut in_mcp_section = false;
 
@@ -141,14 +141,14 @@ fn sync_mcp_to_codex(
         if let Some(config) = server.server_config.as_object() {
             // Convert JSON config to TOML format
             if let Some(command) = config.get("command").and_then(|v| v.as_str()) {
-                new_lines.push(format!("command = \"{}\"", command));
+                new_lines.push(format!("command = \"{command}\""));
             }
 
             if let Some(args) = config.get("args").and_then(|v| v.as_array()) {
                 let args_str: Vec<String> = args
                     .iter()
                     .filter_map(|a| a.as_str())
-                    .map(|s| format!("\"{}\"", s))
+                    .map(|s| format!("\"{s}\""))
                     .collect();
                 new_lines.push(format!("args = [{}]", args_str.join(", ")));
             }
@@ -157,7 +157,7 @@ fn sync_mcp_to_codex(
                 new_lines.push("[mcp_servers.".to_string() + &server.name + ".env]");
                 for (key, value) in env {
                     if let Some(val) = value.as_str() {
-                        new_lines.push(format!("{} = \"{}\"", key, val));
+                        new_lines.push(format!("{key} = \"{val}\""));
                     }
                 }
             }
@@ -224,9 +224,7 @@ pub fn remove_mcp_from_app(
     }
 }
 
-fn remove_mcp_from_claude(
-    server_id: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn remove_mcp_from_claude(server_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".claude").join("settings.json");
 
@@ -251,9 +249,7 @@ fn remove_mcp_from_claude(
     Ok(())
 }
 
-fn remove_mcp_from_codex(
-    server_id: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn remove_mcp_from_codex(server_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".codex").join("config.toml");
 
@@ -262,10 +258,10 @@ fn remove_mcp_from_codex(
     }
 
     let content = std::fs::read_to_string(&config_path)?;
-    let mut lines: Vec<&str> = content.lines().collect();
+    let lines: Vec<&str> = content.lines().collect();
     let mut new_lines: Vec<String> = Vec::new();
-    let section_header = format!("[mcp_servers.{}]", server_id);
-    let env_header = format!("[mcp_servers.{}.env]", server_id);
+    let section_header = format!("[mcp_servers.{server_id}]");
+    let env_header = format!("[mcp_servers.{server_id}.env]");
     let mut skip_section = false;
 
     for line in &lines {
@@ -293,9 +289,7 @@ fn remove_mcp_from_codex(
     Ok(())
 }
 
-fn remove_mcp_from_gemini(
-    server_id: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn remove_mcp_from_gemini(server_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let settings_path = home.join(".gemini").join("settings.json");
 
@@ -331,7 +325,8 @@ pub fn remove_mcp_from_all_apps(
 }
 
 /// Import MCP servers from Claude's settings.json
-pub fn import_mcp_from_claude() -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn import_mcp_from_claude(
+) -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".claude").join("settings.json");
 
@@ -365,7 +360,8 @@ pub fn import_mcp_from_claude() -> Result<Vec<crate::models::McpServer>, Box<dyn
 }
 
 /// Import MCP servers from Codex's config.toml
-pub fn import_mcp_from_codex() -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn import_mcp_from_codex(
+) -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let config_path = home.join(".codex").join("config.toml");
 
@@ -490,7 +486,8 @@ pub fn import_mcp_from_codex() -> Result<Vec<crate::models::McpServer>, Box<dyn 
 }
 
 /// Import MCP servers from Gemini's settings.json
-pub fn import_mcp_from_gemini() -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
+pub fn import_mcp_from_gemini(
+) -> Result<Vec<crate::models::McpServer>, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let settings_path = home.join(".gemini").join("settings.json");
 

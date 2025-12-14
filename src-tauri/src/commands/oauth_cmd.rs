@@ -25,7 +25,7 @@ impl OAuthProvider {
             "kiro" => Ok(OAuthProvider::Kiro),
             "gemini" => Ok(OAuthProvider::Gemini),
             "qwen" => Ok(OAuthProvider::Qwen),
-            _ => Err(format!("Unknown provider: {}", s)),
+            _ => Err(format!("Unknown provider: {s}")),
         }
     }
 
@@ -399,9 +399,10 @@ pub async fn check_and_reload_oauth_credentials(
 
         match result {
             Ok(_) => {
-                logs.write()
-                    .await
-                    .add("info", &format!("[{display_name}][自动检测] 凭证重新加载成功"));
+                logs.write().await.add(
+                    "info",
+                    &format!("[{display_name}][自动检测] 凭证重新加载成功"),
+                );
                 Ok(CheckResult {
                     changed: true,
                     new_hash,

@@ -36,8 +36,8 @@ pub fn read_live_prompt(app: &AppType) -> Result<Option<String>, String> {
     }
 
     fs::read_to_string(&path)
-        .map(|c| Some(c))
-        .map_err(|e| format!("Failed to read prompt file: {}", e))
+        .map(Some)
+        .map_err(|e| format!("Failed to read prompt file: {e}"))
 }
 
 /// Write content to the live prompt file (atomic write)
@@ -46,22 +46,22 @@ pub fn write_live_prompt(app: &AppType, content: &str) -> Result<(), String> {
 
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
     }
 
     // Atomic write: write to temp file first, then rename
     let temp_path = path.with_extension("md.tmp");
 
     let mut file =
-        fs::File::create(&temp_path).map_err(|e| format!("Failed to create temp file: {}", e))?;
+        fs::File::create(&temp_path).map_err(|e| format!("Failed to create temp file: {e}"))?;
 
     file.write_all(content.as_bytes())
-        .map_err(|e| format!("Failed to write content: {}", e))?;
+        .map_err(|e| format!("Failed to write content: {e}"))?;
 
     file.sync_all()
-        .map_err(|e| format!("Failed to sync file: {}", e))?;
+        .map_err(|e| format!("Failed to sync file: {e}"))?;
 
-    fs::rename(&temp_path, &path).map_err(|e| format!("Failed to rename file: {}", e))?;
+    fs::rename(&temp_path, &path).map_err(|e| format!("Failed to rename file: {e}"))?;
 
     Ok(())
 }
@@ -71,7 +71,7 @@ pub fn delete_live_prompt(app: &AppType) -> Result<(), String> {
     let path = get_prompt_file_path(app).ok_or("Cannot determine prompt file path")?;
 
     if path.exists() {
-        fs::remove_file(&path).map_err(|e| format!("Failed to delete prompt file: {}", e))?;
+        fs::remove_file(&path).map_err(|e| format!("Failed to delete prompt file: {e}"))?;
     }
 
     Ok(())

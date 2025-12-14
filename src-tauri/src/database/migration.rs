@@ -1,8 +1,8 @@
 use rusqlite::Connection;
 use serde_json::Value;
-use std::path::PathBuf;
 
 /// 从旧的 JSON 配置迁移数据到 SQLite
+#[allow(dead_code)]
 pub fn migrate_from_json(
     conn: &Connection,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -26,7 +26,7 @@ pub fn migrate_from_json(
 
     if config_path.exists() {
         let content = std::fs::read_to_string(&config_path)?;
-        let config: Value = serde_json::from_str(&content)?;
+        let _config: Value = serde_json::from_str(&content)?;
 
         // TODO: 解析旧配置并插入到数据库
         // 这里需要根据实际的旧配置格式来实现

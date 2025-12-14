@@ -167,7 +167,10 @@ impl PromptDao {
 
     /// Disable all prompts for an app type
     pub fn disable_all(conn: &Connection, app_type: &str) -> Result<(), rusqlite::Error> {
-        conn.execute("UPDATE prompts SET enabled = 0 WHERE app_type = ?", [app_type])?;
+        conn.execute(
+            "UPDATE prompts SET enabled = 0 WHERE app_type = ?",
+            [app_type],
+        )?;
         Ok(())
     }
 
@@ -184,6 +187,7 @@ impl PromptDao {
     }
 
     // Legacy method for compatibility
+    #[allow(dead_code)]
     pub fn set_current(conn: &Connection, app_type: &str, id: &str) -> Result<(), rusqlite::Error> {
         Self::enable(conn, app_type, id)
     }

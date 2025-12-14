@@ -56,7 +56,7 @@ impl McpService {
         let servers = McpDao::get_all(&conn).map_err(|e| e.to_string())?;
         let server = servers.iter().find(|s| s.id == id);
 
-        if let Some(server) = server {
+        if let Some(_server) = server {
             let app = app_type.parse::<AppType>().map_err(|e| e.to_string())?;
             if enabled {
                 // Sync server to the app

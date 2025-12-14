@@ -53,7 +53,10 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
     )?;
 
     // Migration: rename is_current to enabled if old column exists
-    let _ = conn.execute("ALTER TABLE prompts RENAME COLUMN is_current TO enabled", []);
+    let _ = conn.execute(
+        "ALTER TABLE prompts RENAME COLUMN is_current TO enabled",
+        [],
+    );
 
     // Migration: add updated_at column if it doesn't exist
     let _ = conn.execute("ALTER TABLE prompts ADD COLUMN updated_at INTEGER", []);

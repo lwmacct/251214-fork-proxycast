@@ -24,6 +24,7 @@ pub struct Provider {
 }
 
 impl Provider {
+    #[allow(dead_code)]
     pub fn new(id: String, app_type: String, name: String, settings_config: Value) -> Self {
         Self {
             id,

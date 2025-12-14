@@ -46,7 +46,11 @@ fn sync_claude_settings(
     };
 
     // Merge env variables into settings
-    if let Some(env_obj) = provider.settings_config.get("env").and_then(|v| v.as_object()) {
+    if let Some(env_obj) = provider
+        .settings_config
+        .get("env")
+        .and_then(|v| v.as_object())
+    {
         let settings_obj = settings.as_object_mut().ok_or("Invalid settings format")?;
 
         // Ensure env object exists
@@ -72,9 +76,7 @@ fn sync_claude_settings(
 }
 
 /// Sync Codex config to ~/.codex/auth.json and ~/.codex/config.toml
-fn sync_codex_config(
-    provider: &Provider,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn sync_codex_config(provider: &Provider) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let codex_dir = home.join(".codex");
 
@@ -100,9 +102,7 @@ fn sync_codex_config(
 }
 
 /// Sync Gemini config to ~/.gemini/.env and ~/.gemini/settings.json
-fn sync_gemini_config(
-    provider: &Provider,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn sync_gemini_config(provider: &Provider) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let gemini_dir = home.join(".gemini");
 
@@ -110,7 +110,11 @@ fn sync_gemini_config(
     std::fs::create_dir_all(&gemini_dir)?;
 
     // Write .env file
-    if let Some(env_obj) = provider.settings_config.get("env").and_then(|v| v.as_object()) {
+    if let Some(env_obj) = provider
+        .settings_config
+        .get("env")
+        .and_then(|v| v.as_object())
+    {
         let env_path = gemini_dir.join(".env");
         let mut content = String::new();
 
@@ -118,7 +122,7 @@ fn sync_gemini_config(
             if let Some(val) = value.as_str() {
                 // Only write non-empty values
                 if !val.is_empty() {
-                    content.push_str(&format!("{}={}\n", key, val));
+                    content.push_str(&format!("{key}={val}\n"));
                 }
             }
         }
@@ -157,7 +161,9 @@ fn sync_gemini_config(
 }
 
 /// Read current live settings for an app type
-pub fn read_live_settings(app_type: &AppType) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+pub fn read_live_settings(
+    app_type: &AppType,
+) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
 
     match app_type {

@@ -21,6 +21,7 @@ pub struct McpServer {
 }
 
 impl McpServer {
+    #[allow(dead_code)]
     pub fn new(id: String, name: String, server_config: Value) -> Self {
         Self {
             id,

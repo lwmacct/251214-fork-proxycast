@@ -29,7 +29,7 @@ impl std::str::FromStr for AppType {
             "claude" => Ok(AppType::Claude),
             "codex" => Ok(AppType::Codex),
             "gemini" => Ok(AppType::Gemini),
-            _ => Err(format!("Invalid app type: {}", s)),
+            _ => Err(format!("Invalid app type: {s}")),
         }
     }
 }

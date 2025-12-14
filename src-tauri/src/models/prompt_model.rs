@@ -18,6 +18,7 @@ pub struct Prompt {
 }
 
 impl Prompt {
+    #[allow(dead_code)]
     pub fn new(id: String, app_type: String, name: String, content: String) -> Self {
         let now = chrono::Utc::now().timestamp();
         Self {
