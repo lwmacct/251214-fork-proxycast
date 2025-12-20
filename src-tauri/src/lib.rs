@@ -1683,6 +1683,7 @@ pub fn run() {
             commands::provider_pool_cmd::migrate_private_config_to_pool,
             commands::provider_pool_cmd::start_antigravity_oauth_login,
             commands::provider_pool_cmd::get_antigravity_auth_url_and_wait,
+            commands::provider_pool_cmd::get_kiro_credential_fingerprint,
             // Route commands
             commands::route_cmd::get_available_routes,
             commands::route_cmd::get_route_curl_examples,

@@ -404,3 +404,22 @@ export interface MigrationResult {
   skipped_count: number;
   errors: string[];
 }
+
+// Kiro 凭证指纹信息
+export interface KiroFingerprintInfo {
+  /** Machine ID（SHA256 哈希，64 字符） */
+  machine_id: string;
+  /** Machine ID 的短格式（前 16 字符） */
+  machine_id_short: string;
+  /** 指纹来源（profileArn / clientId / system） */
+  source: string;
+  /** 认证方式 */
+  auth_method: string;
+}
+
+// 获取 Kiro 凭证的指纹信息
+export async function getKiroCredentialFingerprint(
+  uuid: string,
+): Promise<KiroFingerprintInfo> {
+  return invoke("get_kiro_credential_fingerprint", { uuid });
+}

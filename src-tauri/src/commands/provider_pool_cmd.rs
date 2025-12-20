@@ -1249,3 +1249,83 @@ pub async fn start_antigravity_oauth_login(
 
     Ok(credential)
 }
+
+/// 获取 Kiro 凭证的 Machine ID 指纹信息
+///
+/// 返回凭证的唯一设备指纹，用于在 UI 中展示
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KiroFingerprintInfo {
+    /// Machine ID（SHA256 哈希，64 字符）
+    pub machine_id: String,
+    /// Machine ID 的短格式（前 16 字符）
+    pub machine_id_short: String,
+    /// 指纹来源（profileArn / clientId / system）
+    pub source: String,
+    /// 认证方式
+    pub auth_method: String,
+}
+
+#[tauri::command]
+pub async fn get_kiro_credential_fingerprint(
+    db: State<'_, DbConnection>,
+    uuid: String,
+) -> Result<KiroFingerprintInfo, String> {
+    use crate::database::dao::provider_pool::ProviderPoolDao;
+    use crate::providers::kiro::{generate_machine_id_from_credentials, KiroProvider};
+
+    // 获取凭证文件路径（在锁释放前完成）
+    let creds_file_path = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let credential = ProviderPoolDao::get_by_uuid(&conn, &uuid)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("凭证不存在: {}", uuid))?;
+
+        // 检查是否为 Kiro 凭证
+        match &credential.credential {
+            CredentialData::KiroOAuth { creds_file_path } => creds_file_path.clone(),
+            _ => return Err("只有 Kiro 凭证支持获取指纹信息".to_string()),
+        }
+    }; // conn 在这里释放
+
+    // 加载凭证文件（异步操作，锁已释放）
+    let mut provider = KiroProvider::new();
+    provider
+        .load_credentials_from_path(&creds_file_path)
+        .await
+        .map_err(|e| format!("加载凭证失败: {}", e))?;
+
+    // 确定指纹来源
+    let (source, profile_arn, client_id) = if provider.credentials.profile_arn.is_some() {
+        (
+            "profileArn".to_string(),
+            provider.credentials.profile_arn.as_deref(),
+            None,
+        )
+    } else if provider.credentials.client_id.is_some() {
+        (
+            "clientId".to_string(),
+            None,
+            provider.credentials.client_id.as_deref(),
+        )
+    } else {
+        ("system".to_string(), None, None)
+    };
+
+    // 生成 Machine ID
+    let machine_id = generate_machine_id_from_credentials(profile_arn, client_id);
+    let machine_id_short = machine_id[..16].to_string();
+
+    // 获取认证方式
+    let auth_method = provider
+        .credentials
+        .auth_method
+        .clone()
+        .unwrap_or_else(|| "social".to_string());
+
+    Ok(KiroFingerprintInfo {
+        machine_id,
+        machine_id_short,
+        source,
+        auth_method,
+    })
+}

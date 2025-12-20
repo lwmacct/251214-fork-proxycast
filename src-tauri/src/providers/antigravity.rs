@@ -38,9 +38,12 @@ const REFRESH_SKEW: i64 = 3000;
 pub const ANTIGRAVITY_MODELS: &[&str] = &[
     "gemini-3-pro-preview",
     "gemini-3-pro-image-preview",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
     "gemini-2.5-computer-use-preview-10-2025",
     "gemini-claude-sonnet-4-5",
     "gemini-claude-sonnet-4-5-thinking",
+    "gemini-claude-opus-4-5-thinking",
 ];
 
 /// 模型别名映射（用户友好名称 -> 内部名称）
@@ -49,8 +52,11 @@ fn alias_to_model_name(model: &str) -> &str {
         "gemini-2.5-computer-use-preview-10-2025" => "rev19-uic3-1p",
         "gemini-3-pro-image-preview" => "gemini-3-pro-image",
         "gemini-3-pro-preview" => "gemini-3-pro-high",
+        "gemini-3-flash-preview" => "gemini-3-flash",
+        "gemini-2.5-flash" => "gemini-2.5-flash",
         "gemini-claude-sonnet-4-5" => "claude-sonnet-4-5",
         "gemini-claude-sonnet-4-5-thinking" => "claude-sonnet-4-5-thinking",
+        "gemini-claude-opus-4-5-thinking" => "claude-opus-4-5-thinking",
         _ => model,
     }
 }
@@ -62,8 +68,11 @@ fn model_name_to_alias(model: &str) -> &str {
         "rev19-uic3-1p" => "gemini-2.5-computer-use-preview-10-2025",
         "gemini-3-pro-image" => "gemini-3-pro-image-preview",
         "gemini-3-pro-high" => "gemini-3-pro-preview",
+        "gemini-3-flash" => "gemini-3-flash-preview",
+        "gemini-2.5-flash" => "gemini-2.5-flash",
         "claude-sonnet-4-5" => "gemini-claude-sonnet-4-5",
         "claude-sonnet-4-5-thinking" => "gemini-claude-sonnet-4-5-thinking",
+        "claude-opus-4-5-thinking" => "gemini-claude-opus-4-5-thinking",
         _ => model,
     }
 }

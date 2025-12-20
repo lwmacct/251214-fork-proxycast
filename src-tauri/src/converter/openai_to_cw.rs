@@ -5,18 +5,31 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// 模型映射表
+///
+/// 参考 AIClient-2-API 的 provider-models.js 和 claude-kiro.js
+/// 支持的模型列表：
+/// - claude-opus-4-5, claude-opus-4-5-20251101
+/// - claude-haiku-4-5, claude-haiku-4-5-20251001
+/// - claude-sonnet-4-5, claude-sonnet-4-5-20250929
+/// - claude-sonnet-4-20250514
+/// - claude-3-7-sonnet-20250219, claude-3-5-sonnet-20241022, claude-3-5-sonnet-latest
 pub fn get_model_map() -> HashMap<&'static str, &'static str> {
     let mut map = HashMap::new();
+    // Opus 4.5 系列
     map.insert("claude-opus-4-5", "claude-opus-4.5");
     map.insert("claude-opus-4-5-20251101", "claude-opus-4.5");
+    // Haiku 4.5 系列
     map.insert("claude-haiku-4-5", "claude-haiku-4.5");
     map.insert("claude-haiku-4-5-20251001", "claude-haiku-4.5");
+    // Sonnet 4.5 系列
     map.insert("claude-sonnet-4-5", "CLAUDE_SONNET_4_5_20250929_V1_0");
     map.insert(
         "claude-sonnet-4-5-20250929",
         "CLAUDE_SONNET_4_5_20250929_V1_0",
     );
+    // Sonnet 4 系列
     map.insert("claude-sonnet-4-20250514", "CLAUDE_SONNET_4_20250514_V1_0");
+    // Sonnet 3.7/3.5 系列（兼容旧版本）
     map.insert(
         "claude-3-7-sonnet-20250219",
         "CLAUDE_3_7_SONNET_20250219_V1_0",
@@ -30,6 +43,22 @@ pub fn get_model_map() -> HashMap<&'static str, &'static str> {
         "CLAUDE_3_7_SONNET_20250219_V1_0",
     );
     map
+}
+
+/// 获取 Kiro 支持的模型列表
+///
+/// 返回所有支持的模型 ID，用于前端展示和健康检查
+pub fn get_supported_models() -> Vec<&'static str> {
+    vec![
+        "claude-opus-4-5",
+        "claude-opus-4-5-20251101",
+        "claude-haiku-4-5",
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-20250514",
+        "claude-3-7-sonnet-20250219",
+    ]
 }
 
 pub const DEFAULT_MODEL: &str = "CLAUDE_SONNET_4_5_20250929_V1_0";

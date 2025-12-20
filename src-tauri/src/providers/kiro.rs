@@ -6,7 +6,73 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::PathBuf;
 
-/// 生成设备指纹 (Machine ID 的 SHA256)
+/// 根据凭证信息生成唯一的 Machine ID（参考 AIClient-2-API 实现）
+///
+/// 关键改进：每个凭证生成独立的 Machine ID，避免多账号共用同一指纹被检测
+/// 优先级：profileArn > clientId > 系统硬件 ID
+///
+/// 这样每个 OAuth 凭证都有自己独立的指纹，模拟不同设备登录
+pub fn generate_machine_id_from_credentials(
+    profile_arn: Option<&str>,
+    client_id: Option<&str>,
+) -> String {
+    use sha2::{Digest, Sha256};
+
+    // 优先使用凭证相关的唯一标识，确保每个账号有独立的 Machine ID
+    let unique_key = profile_arn
+        .filter(|s| !s.is_empty())
+        .or(client_id.filter(|s| !s.is_empty()))
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            // 回退到系统硬件 ID
+            get_raw_machine_id().unwrap_or_else(|| "KIRO_DEFAULT_MACHINE".to_string())
+        });
+
+    let mut hasher = Sha256::new();
+    hasher.update(unique_key.as_bytes());
+    let result = hasher.finalize();
+    format!("{:x}", result)
+}
+
+/// 获取系统运行时信息
+///
+/// 返回真实的操作系统名称和版本，用于构建更真实的 User-Agent
+fn get_system_runtime_info() -> (String, String) {
+    let os_name = if cfg!(target_os = "macos") {
+        // macOS: 获取真实版本号
+        let version = std::process::Command::new("sw_vers")
+            .arg("-productVersion")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| "14.0".to_string());
+        format!("macos#{}", version)
+    } else if cfg!(target_os = "linux") {
+        // Linux: 获取内核版本
+        let version = std::process::Command::new("uname")
+            .arg("-r")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| "5.15.0".to_string());
+        format!("linux#{}", version)
+    } else if cfg!(target_os = "windows") {
+        // Windows: 使用固定版本（实际应该获取真实版本）
+        "windows#10.0".to_string()
+    } else {
+        "other#1.0".to_string()
+    };
+
+    // Node.js 版本模拟（Kiro IDE 使用 Electron，内置 Node.js）
+    // 使用常见的 LTS 版本
+    let node_version = "20.18.0".to_string();
+
+    (os_name, node_version)
+}
+
+/// 生成设备指纹 (Machine ID 的 SHA256) - 保留用于兼容
 ///
 /// 与 Kiro IDE 保持一致的指纹生成方式（参考 Kir-Manager）：
 /// - macOS: 使用 IOPlatformUUID（硬件级别唯一标识）
@@ -657,7 +723,11 @@ impl KiroProvider {
         );
 
         // 获取设备指纹和版本号（用于 Social 认证的 User-Agent）
-        let device_fp = get_device_fingerprint();
+        // 使用基于凭证的 Machine ID，确保每个账号有独立的指纹
+        let machine_id = generate_machine_id_from_credentials(
+            self.credentials.profile_arn.as_deref(),
+            self.credentials.client_id.as_deref(),
+        );
         let kiro_version = get_kiro_version();
 
         let resp = if auth_method == "idc" {
@@ -690,11 +760,11 @@ impl KiroProvider {
                 .header("Host", "oidc.us-east-1.amazonaws.com")
                 .header(
                     "x-amz-user-agent",
-                    "aws-sdk-js/3.738.0 ua/2.1 os/other lang/js api/sso-oidc#3.738.0 m/E KiroIDE",
+                    format!("aws-sdk-js/3.738.0 ua/2.1 os/other lang/js api/sso-oidc#3.738.0 m/E KiroIDE-{}-{}", kiro_version, machine_id),
                 )
                 .header("User-Agent", "node")
                 .header("Accept", "*/*")
-                .header("Connection", "keep-alive")
+                .header("Connection", "close")
                 .json(&body)
                 .send()
                 .await?
@@ -707,13 +777,14 @@ impl KiroProvider {
                 .post(&refresh_url)
                 .header(
                     "User-Agent",
-                    format!("KiroIDE-{}-{}", kiro_version, device_fp),
+                    format!("KiroIDE-{}-{}", kiro_version, machine_id),
                 )
                 .header("Accept", "application/json, text/plain, */*")
                 .header("Accept-Encoding", "br, gzip, deflate")
                 .header("Content-Type", "application/json")
                 .header("Accept-Language", "*")
                 .header("Sec-Fetch-Mode", "cors")
+                .header("Connection", "close")
                 .json(&body)
                 .send()
                 .await?
@@ -881,7 +952,7 @@ impl KiroProvider {
             None
         };
 
-        let cw_request = convert_openai_to_codewhisperer(request, profile_arn);
+        let cw_request = convert_openai_to_codewhisperer(request, profile_arn.clone());
         let url = self.get_base_url();
 
         // Debug: 记录转换后的请求
@@ -923,9 +994,20 @@ impl KiroProvider {
             );
         }
 
-        // 生成设备指纹用于伪装 Kiro IDE
-        let device_fp = get_device_fingerprint();
+        // 生成基于凭证的唯一 Machine ID（关键改进：每个账号独立指纹）
+        let machine_id = generate_machine_id_from_credentials(
+            profile_arn.as_deref(),
+            self.credentials.client_id.as_deref(),
+        );
         let kiro_version = get_kiro_version();
+        let (os_name, node_version) = get_system_runtime_info();
+
+        tracing::debug!(
+            "[KIRO_FINGERPRINT] machine_id={} (based on profile_arn={}, client_id={})",
+            &machine_id[..16],
+            profile_arn.is_some(),
+            self.credentials.client_id.is_some()
+        );
 
         let resp = self
             .client
@@ -935,17 +1017,20 @@ impl KiroProvider {
             .header("Accept", "application/json")
             .header("amz-sdk-invocation-id", uuid::Uuid::new_v4().to_string())
             .header("amz-sdk-request", "attempt=1; max=1")
+            .header("x-amzn-kiro-agent-mode", "vibe")
+            // 关键指纹头：使用基于凭证的唯一 Machine ID
             .header(
                 "x-amz-user-agent",
-                format!("aws-sdk-js/1.0.7 KiroIDE-{kiro_version}-{device_fp}"),
+                format!("aws-sdk-js/1.0.0 KiroIDE-{kiro_version}-{machine_id}"),
             )
             .header(
                 "user-agent",
                 format!(
-                    "aws-sdk-js/1.0.7 ua/2.1 os/macos#14.0 lang/js md/nodejs#20.16.0 api/codewhispererstreaming#1.0.7 m/E KiroIDE-{kiro_version}-{device_fp}"
+                    "aws-sdk-js/1.0.0 ua/2.1 os/{os_name} lang/js md/nodejs#{node_version} api/codewhispererruntime#1.0.0 m/E KiroIDE-{kiro_version}-{machine_id}"
                 ),
             )
-            .header("x-amzn-kiro-agent-mode", "vibe")
+            // 添加 Connection: close 避免连接复用被检测
+            .header("Connection", "close")
             .json(&cw_request)
             .send()
             .await?;

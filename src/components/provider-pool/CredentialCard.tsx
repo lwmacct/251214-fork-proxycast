@@ -17,10 +17,17 @@ import {
   Globe,
   BarChart3,
   ChevronUp,
+  Fingerprint,
+  Copy,
+  Check,
 } from "lucide-react";
 import type {
   CredentialDisplay,
   CredentialSource,
+} from "@/lib/api/providerPool";
+import {
+  getKiroCredentialFingerprint,
+  type KiroFingerprintInfo,
 } from "@/lib/api/providerPool";
 import { usageApi, type UsageInfo } from "@/lib/api/usage";
 import { UsageDisplay } from "./UsageDisplay";
@@ -58,6 +65,46 @@ export function CredentialCard({
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
+
+  // 指纹信息状态（仅 Kiro 凭证）
+  const [fingerprintInfo, setFingerprintInfo] =
+    useState<KiroFingerprintInfo | null>(null);
+  const [fingerprintLoading, setFingerprintLoading] = useState(false);
+  const [fingerprintExpanded, setFingerprintExpanded] = useState(false);
+  const [fingerprintCopied, setFingerprintCopied] = useState(false);
+
+  // 查询指纹信息
+  const handleCheckFingerprint = async () => {
+    if (fingerprintExpanded && fingerprintInfo) {
+      // 已展开且有数据，直接折叠
+      setFingerprintExpanded(false);
+      return;
+    }
+
+    setFingerprintExpanded(true);
+    setFingerprintLoading(true);
+
+    try {
+      const info = await getKiroCredentialFingerprint(credential.uuid);
+      setFingerprintInfo(info);
+    } catch (e) {
+      console.error("获取指纹信息失败:", e);
+    } finally {
+      setFingerprintLoading(false);
+    }
+  };
+
+  // 复制 Machine ID
+  const handleCopyMachineId = async () => {
+    if (!fingerprintInfo) return;
+    try {
+      await navigator.clipboard.writeText(fingerprintInfo.machine_id);
+      setFingerprintCopied(true);
+      setTimeout(() => setFingerprintCopied(false), 2000);
+    } catch (e) {
+      console.error("复制失败:", e);
+    }
+  };
 
   // 查询用量
   const handleCheckUsage = async () => {
@@ -295,6 +342,24 @@ export function CredentialCard({
             </button>
           )}
 
+          {/* 指纹信息按钮 - 仅 Kiro 凭证显示 */}
+          {isKiroCredential && (
+            <button
+              onClick={handleCheckFingerprint}
+              disabled={fingerprintLoading}
+              className={`rounded-lg p-2 transition-colors ${
+                fingerprintExpanded
+                  ? "bg-indigo-200 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-200"
+                  : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400"
+              } disabled:opacity-50`}
+              title="查看设备指纹"
+            >
+              <Fingerprint
+                className={`h-4 w-4 ${fingerprintLoading ? "animate-pulse" : ""}`}
+              />
+            </button>
+          )}
+
           {/* 用量查询按钮 - 仅 Kiro 凭证显示 */}
           {isKiroCredential && (
             <button
@@ -359,6 +424,85 @@ export function CredentialCard({
         <div className="mt-3 rounded-lg bg-red-100 p-2 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
           {credential.last_error_message.slice(0, 150)}
           {credential.last_error_message.length > 150 && "..."}
+        </div>
+      )}
+
+      {/* 指纹信息展示区域 - 仅 Kiro 凭证 */}
+      {isKiroCredential && fingerprintExpanded && (
+        <div className="mt-3 pt-3 border-t border-border/30">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Fingerprint className="h-3 w-3" />
+              设备指纹
+            </span>
+            <button
+              onClick={() => setFingerprintExpanded(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+          </div>
+
+          {fingerprintLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+              加载中...
+            </div>
+          ) : fingerprintInfo ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Machine ID:
+                </span>
+                <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {fingerprintInfo.machine_id_short}...
+                </code>
+                <button
+                  onClick={handleCopyMachineId}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  title="复制完整 Machine ID"
+                >
+                  {fingerprintCopied ? (
+                    <Check className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <Copy className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1">
+                  <span className="text-muted-foreground">来源:</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded ${
+                      fingerprintInfo.source === "profileArn"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : fingerprintInfo.source === "clientId"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                    }`}
+                  >
+                    {fingerprintInfo.source}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="text-muted-foreground">认证:</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded ${
+                      fingerprintInfo.auth_method.toLowerCase() === "idc"
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                    }`}
+                  >
+                    {fingerprintInfo.auth_method}
+                  </span>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">
+              无法获取指纹信息
+            </div>
+          )}
         </div>
       )}
 
