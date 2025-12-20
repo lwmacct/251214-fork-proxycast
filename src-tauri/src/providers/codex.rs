@@ -21,23 +21,39 @@ const CODEX_API_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 /// Codex OAuth credentials storage
 ///
 /// Stores OAuth tokens and user information for Codex authentication.
-/// Compatible with CLIProxyAPI's CodexTokenStorage format.
+/// Compatible with CLIProxyAPI's CodexTokenStorage format and Codex CLI official format.
+///
+/// Supports multiple field name formats:
+/// - snake_case: `refresh_token`, `access_token`, `id_token`, `account_id`, `last_refresh`
+/// - camelCase: `refreshToken`, `accessToken`, `idToken`, `accountId`, `lastRefresh`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexCredentials {
     /// JWT ID token containing user claims
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "idToken")]
     pub id_token: Option<String>,
     /// OAuth2 access token for API access
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "accessToken"
+    )]
     pub access_token: Option<String>,
     /// Refresh token for obtaining new access tokens
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "refreshToken"
+    )]
     pub refresh_token: Option<String>,
     /// OpenAI account identifier
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "accountId")]
     pub account_id: Option<String>,
     /// Timestamp of last token refresh
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "lastRefresh"
+    )]
     pub last_refresh: Option<String>,
     /// User email address
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -46,7 +62,14 @@ pub struct CodexCredentials {
     #[serde(default = "default_type")]
     pub r#type: String,
     /// Token expiration timestamp (RFC3339 format)
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "expired")]
+    /// Supports: `expired`, `expires_at`, `expiresAt`
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "expired",
+        alias = "expires_at",
+        alias = "expiresAt"
+    )]
     pub expires_at: Option<String>,
 }
 
@@ -426,17 +449,39 @@ impl CodexProvider {
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
             let content = tokio::fs::read_to_string(&path).await?;
-            let creds: CodexCredentials = serde_json::from_str(&content)?;
+
+            // 尝试解析凭证文件
+            let creds: CodexCredentials = serde_json::from_str(&content).map_err(|e| {
+                tracing::error!("[CODEX] 凭证文件解析失败: {}. 文件路径: {:?}", e, path);
+                format!("凭证文件格式错误: {}", e)
+            })?;
+
+            // 检查关键字段
+            if creds.refresh_token.is_none() {
+                tracing::warn!(
+                    "[CODEX] 凭证文件缺少 refresh_token 字段。支持的字段名: refresh_token, refreshToken"
+                );
+                // 打印文件中的顶级字段名，帮助调试
+                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(obj) = json_value.as_object() {
+                        let keys: Vec<&String> = obj.keys().collect();
+                        tracing::info!("[CODEX] 凭证文件包含的字段: {:?}", keys);
+                    }
+                }
+            }
+
             tracing::info!(
-                "[CODEX] Credentials loaded: has_access={}, has_refresh={}, email={:?}",
+                "[CODEX] 凭证加载成功: has_access={}, has_refresh={}, email={:?}, path={:?}",
                 creds.access_token.is_some(),
                 creds.refresh_token.is_some(),
-                creds.email
+                creds.email,
+                path
             );
             self.credentials = creds;
             self.creds_path = Some(path.clone());
         } else {
-            tracing::warn!("[CODEX] Credentials file not found: {:?}", path);
+            tracing::warn!("[CODEX] 凭证文件不存在: {:?}", path);
+            return Err(format!("凭证文件不存在: {:?}", path).into());
         }
         Ok(())
     }
@@ -582,13 +627,14 @@ impl CodexProvider {
 
     /// Refresh the access token using the refresh token
     pub async fn refresh_token(&mut self) -> Result<String, Box<dyn Error + Send + Sync>> {
-        let refresh_token = self
-            .credentials
-            .refresh_token
-            .as_ref()
-            .ok_or_else(|| create_config_error("没有可用的 refresh_token"))?;
+        let refresh_token = self.credentials.refresh_token.as_ref().ok_or_else(|| {
+            create_config_error(
+                "没有可用的 refresh_token。请确保凭证文件包含 refresh_token 或 refreshToken 字段，\
+                    或使用 OAuth 登录功能重新获取凭证",
+            )
+        })?;
 
-        tracing::info!("[CODEX] Refreshing access token");
+        tracing::info!("[CODEX] 正在刷新 access token");
 
         let params = [
             ("client_id", OPENAI_CLIENT_ID),
@@ -1136,6 +1182,70 @@ mod tests {
         let parsed: CodexCredentials = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.access_token, creds.access_token);
         assert_eq!(parsed.email, creds.email);
+    }
+
+    #[test]
+    fn test_codex_credentials_camel_case_alias() {
+        // 测试 camelCase 字段名的支持（Codex CLI 官方格式）
+        let json = r#"{
+            "idToken": "test_id_token",
+            "accessToken": "test_access_token",
+            "refreshToken": "test_refresh_token",
+            "accountId": "test_account_id",
+            "lastRefresh": "2024-01-01T00:00:00Z",
+            "email": "test@example.com",
+            "type": "codex",
+            "expiresAt": "2024-12-31T23:59:59Z"
+        }"#;
+
+        let creds: CodexCredentials = serde_json::from_str(json).unwrap();
+        assert_eq!(creds.id_token, Some("test_id_token".to_string()));
+        assert_eq!(creds.access_token, Some("test_access_token".to_string()));
+        assert_eq!(creds.refresh_token, Some("test_refresh_token".to_string()));
+        assert_eq!(creds.account_id, Some("test_account_id".to_string()));
+        assert_eq!(creds.last_refresh, Some("2024-01-01T00:00:00Z".to_string()));
+        assert_eq!(creds.email, Some("test@example.com".to_string()));
+        assert_eq!(creds.expires_at, Some("2024-12-31T23:59:59Z".to_string()));
+    }
+
+    #[test]
+    fn test_codex_credentials_snake_case() {
+        // 测试 snake_case 字段名的支持（CLIProxyAPI 格式）
+        let json = r#"{
+            "id_token": "test_id_token",
+            "access_token": "test_access_token",
+            "refresh_token": "test_refresh_token",
+            "account_id": "test_account_id",
+            "last_refresh": "2024-01-01T00:00:00Z",
+            "email": "test@example.com",
+            "type": "codex",
+            "expired": "2024-12-31T23:59:59Z"
+        }"#;
+
+        let creds: CodexCredentials = serde_json::from_str(json).unwrap();
+        assert_eq!(creds.id_token, Some("test_id_token".to_string()));
+        assert_eq!(creds.access_token, Some("test_access_token".to_string()));
+        assert_eq!(creds.refresh_token, Some("test_refresh_token".to_string()));
+        assert_eq!(creds.account_id, Some("test_account_id".to_string()));
+        assert_eq!(creds.last_refresh, Some("2024-01-01T00:00:00Z".to_string()));
+        assert_eq!(creds.email, Some("test@example.com".to_string()));
+        assert_eq!(creds.expires_at, Some("2024-12-31T23:59:59Z".to_string()));
+    }
+
+    #[test]
+    fn test_codex_credentials_expires_at_alias() {
+        // 测试 expires_at 字段的多种别名
+        let json1 = r#"{"expired": "2024-12-31T23:59:59Z"}"#;
+        let json2 = r#"{"expires_at": "2024-12-31T23:59:59Z"}"#;
+        let json3 = r#"{"expiresAt": "2024-12-31T23:59:59Z"}"#;
+
+        let creds1: CodexCredentials = serde_json::from_str(json1).unwrap();
+        let creds2: CodexCredentials = serde_json::from_str(json2).unwrap();
+        let creds3: CodexCredentials = serde_json::from_str(json3).unwrap();
+
+        assert_eq!(creds1.expires_at, Some("2024-12-31T23:59:59Z".to_string()));
+        assert_eq!(creds2.expires_at, Some("2024-12-31T23:59:59Z".to_string()));
+        assert_eq!(creds3.expires_at, Some("2024-12-31T23:59:59Z".to_string()));
     }
 
     #[test]
