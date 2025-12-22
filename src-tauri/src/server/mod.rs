@@ -1575,7 +1575,7 @@ async fn amp_management_proxy_internal(
         None => {
             state.logs.write().await.add(
                 "warn",
-                &format!("[AMP] No upstream URL configured for management proxy"),
+                "[AMP] No upstream URL configured for management proxy",
             );
             return (
                 StatusCode::SERVICE_UNAVAILABLE,

@@ -134,8 +134,8 @@ pub struct AntigravityCredentials {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable: Option<bool>,
     /// 项目 ID
-    #[serde(skip_serializing_if = "Option::is_none", alias = "project_id")]
-    pub projectId: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
     /// 用户邮箱
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
@@ -159,7 +159,7 @@ impl Default for AntigravityCredentials {
             expires_in: None,
             timestamp: None,
             enable: None,
-            projectId: None,
+            project_id: None,
             email: None,
         }
     }
@@ -225,8 +225,8 @@ impl AntigravityProvider {
         // 尝试解析为单个凭证对象
         if let Ok(creds) = serde_json::from_str::<AntigravityCredentials>(&content) {
             self.credentials = creds;
-            // 如果凭证中有 projectId，设置到 provider
-            if let Some(ref pid) = self.credentials.projectId {
+            // 如果凭证中有 project_id，设置到 provider
+            if let Some(ref pid) = self.credentials.project_id {
                 self.project_id = Some(pid.clone());
             }
             return Ok(());
@@ -237,8 +237,8 @@ impl AntigravityProvider {
             // 找到第一个启用的凭证
             if let Some(creds) = creds_array.into_iter().find(|c| c.enable != Some(false)) {
                 self.credentials = creds;
-                // 如果凭证中有 projectId，设置到 provider
-                if let Some(ref pid) = self.credentials.projectId {
+                // 如果凭证中有 project_id，设置到 provider
+                if let Some(ref pid) = self.credentials.project_id {
                     self.project_id = Some(pid.clone());
                 }
                 return Ok(());
@@ -765,7 +765,7 @@ pub async fn fetch_project_id_for_oauth(
                         tracing::info!("[Antigravity OAuth] cloudaicompanionProject 为空字符串，有资格但无 projectId");
                         Ok(Some(FetchedProjectId::NoProject)) // 空字符串，有资格但无 projectId
                     } else {
-                        tracing::info!("[Antigravity OAuth] 获取到 projectId: {}", s);
+                        tracing::info!("[Antigravity OAuth] 获取到 project_id: {}", s);
                         Ok(Some(FetchedProjectId::HasProject(s.to_string()))) // 有 projectId
                     }
                 } else {
@@ -986,7 +986,7 @@ pub async fn start_oauth_server_and_get_url(
                     expires_in,
                     timestamp: Some(now.timestamp_millis()),
                     enable: Some(true),
-                    projectId: project_id,
+                    project_id: project_id,
                     email: email.clone(),
                 };
 
@@ -1207,7 +1207,7 @@ pub async fn start_oauth_login_with_port(
                     expires_in,
                     timestamp: Some(now.timestamp_millis()),
                     enable: Some(true),
-                    projectId: project_id,
+                    project_id: project_id,
                     email: email.clone(),
                 };
 
@@ -1433,7 +1433,7 @@ pub async fn start_oauth_login(
                     expires_in,
                     timestamp: Some(now.timestamp_millis()),
                     enable: Some(true),
-                    projectId: project_id,
+                    project_id: project_id,
                     email: email.clone(),
                 };
 

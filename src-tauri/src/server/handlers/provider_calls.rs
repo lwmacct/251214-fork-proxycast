@@ -20,7 +20,6 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use futures::StreamExt;
 
 use crate::converter::anthropic_to_openai::convert_anthropic_to_openai;
 use crate::converter::openai_to_antigravity::{
@@ -696,20 +695,6 @@ pub async fn call_provider_openai(
     request: &ChatCompletionRequest,
     flow_id: Option<&str>,
 ) -> Response {
-    // 如果是流式请求且有 flow_id，设置流式状态
-    if request.stream {
-        if let Some(fid) = flow_id {
-            // 根据凭证类型确定流格式
-            let format = match &credential.credential {
-                CredentialData::KiroOAuth { .. } => StreamFormat::OpenAI,
-                CredentialData::ClaudeKey { .. } => StreamFormat::Anthropic,
-                CredentialData::AntigravityOAuth { .. } => StreamFormat::Gemini,
-                _ => StreamFormat::OpenAI,
-            };
-            state.flow_monitor.set_streaming(fid, format).await;
-        }
-    }
-
     let _start_time = std::time::Instant::now();
     match &credential.credential {
         CredentialData::KiroOAuth { creds_file_path } => {

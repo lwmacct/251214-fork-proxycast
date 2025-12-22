@@ -500,7 +500,8 @@ mod base64 {
     }
 }
 
-pub use self::base64::{decode as base64_decode, encode as base64_encode};
+pub use self::base64::decode as base64_decode;
+pub use self::base64::encode as base64_encode;
 
 #[cfg(test)]
 mod unit_tests {

@@ -1826,6 +1826,7 @@ pub fn run() {
             commands::config_cmd::expand_path,
             commands::config_cmd::open_auth_dir,
             commands::config_cmd::check_for_updates,
+            commands::config_cmd::download_update,
             // MCP commands
             commands::mcp_cmd::get_mcp_servers,
             commands::mcp_cmd::add_mcp_server,
