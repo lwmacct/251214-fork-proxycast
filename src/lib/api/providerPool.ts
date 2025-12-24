@@ -10,7 +10,8 @@ export type PoolProviderType =
   | "claude"
   | "codex"
   | "claude_oauth"
-  | "iflow";
+  | "iflow"
+  | "gemini_api_key";
 
 // Credential data types
 export interface KiroOAuthCredential {
@@ -47,6 +48,13 @@ export interface ClaudeKeyCredential {
   base_url?: string;
 }
 
+export interface GeminiApiKeyCredential {
+  type: "gemini_api_key";
+  api_key: string;
+  base_url?: string;
+  excluded_models?: string[];
+}
+
 export interface CodexOAuthCredential {
   type: "codex_oauth";
   creds_file_path: string;
@@ -74,6 +82,7 @@ export type CredentialData =
   | AntigravityOAuthCredential
   | OpenAIKeyCredential
   | ClaudeKeyCredential
+  | GeminiApiKeyCredential
   | CodexOAuthCredential
   | ClaudeOAuthCredential
   | IFlowOAuthCredential
@@ -325,6 +334,20 @@ export const providerPoolApi = {
     name?: string,
   ): Promise<ProviderCredential> {
     return invoke("add_claude_key_credential", { apiKey, baseUrl, name });
+  },
+
+  async addGeminiApiKey(
+    apiKey: string,
+    baseUrl?: string,
+    excludedModels?: string[],
+    name?: string,
+  ): Promise<ProviderCredential> {
+    return invoke("add_gemini_api_key_credential", {
+      apiKey,
+      baseUrl,
+      excludedModels,
+      name,
+    });
   },
 
   async addAntigravityOAuth(

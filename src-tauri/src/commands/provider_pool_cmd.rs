@@ -913,6 +913,30 @@ pub fn add_claude_key_credential(
     )
 }
 
+/// 添加 Gemini API Key 凭证
+#[tauri::command]
+pub fn add_gemini_api_key_credential(
+    db: State<'_, DbConnection>,
+    pool_service: State<'_, ProviderPoolServiceState>,
+    api_key: String,
+    base_url: Option<String>,
+    excluded_models: Option<Vec<String>>,
+    name: Option<String>,
+) -> Result<ProviderCredential, String> {
+    pool_service.0.add_credential(
+        &db,
+        "gemini_api_key",
+        CredentialData::GeminiApiKey {
+            api_key,
+            base_url,
+            excluded_models: excluded_models.unwrap_or_default(),
+        },
+        name,
+        Some(true),
+        None,
+    )
+}
+
 /// 添加 Codex OAuth 凭证（通过文件路径）
 #[tauri::command]
 pub fn add_codex_oauth_credential(

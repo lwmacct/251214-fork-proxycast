@@ -42,10 +42,13 @@ export function AddCredentialModal({
   // API Key 字段
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [excludedModels, setExcludedModels] = useState<string[]>([]);
 
   // 判断是否为 OAuth 类型（不包括有特殊表单的 antigravity、codex、claude_oauth、qwen、iflow、gemini、kiro）
   const isSimpleOAuth: string[] = []; // Kiro 现在有自己的表单
-  const isApiKey = ["openai", "claude"].includes(providerType);
+  const isApiKey = ["openai", "claude", "gemini_api_key"].includes(
+    providerType,
+  );
 
   const handleSelectFile = async () => {
     try {
@@ -197,6 +200,14 @@ export function AddCredentialModal({
               trimmedName,
             );
             break;
+          case "gemini_api_key":
+            await providerPoolApi.addGeminiApiKey(
+              apiKey,
+              baseUrl.trim() || undefined,
+              excludedModels.length > 0 ? excludedModels : undefined,
+              trimmedName,
+            );
+            break;
         }
       }
 
@@ -284,7 +295,9 @@ export function AddCredentialModal({
           placeholder={
             providerType === "openai"
               ? "https://api.openai.com/v1"
-              : "https://api.anthropic.com/v1"
+              : providerType === "claude"
+                ? "https://api.anthropic.com/v1"
+                : "https://generativelanguage.googleapis.com"
           }
           className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
         />
@@ -292,6 +305,31 @@ export function AddCredentialModal({
           留空使用默认 URL，或输入自定义代理地址
         </p>
       </div>
+
+      {providerType === "gemini_api_key" && (
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            排除模型 (可选)
+          </label>
+          <input
+            type="text"
+            value={excludedModels.join(", ")}
+            onChange={(e) =>
+              setExcludedModels(
+                e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter((s) => s),
+              )
+            }
+            placeholder="gemini-1.5-pro, gemini-1.5-flash..."
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            用逗号分隔多个模型名称，支持通配符（如 *-preview）
+          </p>
+        </div>
+      )}
     </>
   );
 

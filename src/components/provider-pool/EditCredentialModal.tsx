@@ -60,6 +60,14 @@ const providerModels: Record<PoolProviderType, string[]> = {
     "claude-sonnet-4-20250514",
   ], // Claude OAuth
   iflow: ["deepseek-chat", "deepseek-reasoner"], // iFlow
+  gemini_api_key: [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-2.5-pro-preview-06-05",
+    "gemini-2.5-flash-preview-09-2025",
+    "gemini-3-pro-preview",
+  ], // Gemini API Key
 };
 
 export function EditCredentialModal({

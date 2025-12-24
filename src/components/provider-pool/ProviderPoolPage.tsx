@@ -44,8 +44,8 @@ const oauthProviderTypes: PoolProviderType[] = [
 // API Key 类型凭证（直接填入 API Key）
 const apiKeyProviderTypes: PoolProviderType[] = ["openai", "claude"];
 
-// 配置类型 tab（非凭证池）- gemini_api 移到 API Key 分类下
-type ConfigTabType = "gemini_api" | "vertex" | "amp";
+// 配置类型 tab（非凭证池，存储在配置文件中）
+type ConfigTabType = "vertex" | "amp" | "gemini_api_key";
 
 // 所有 tab 类型
 type TabType = PoolProviderType | ConfigTabType;
@@ -60,17 +60,18 @@ const providerLabels: Record<PoolProviderType, string> = {
   codex: "Codex (OAuth / API Key)",
   claude_oauth: "Claude OAuth",
   iflow: "iFlow",
+  gemini_api_key: "Gemini",
 };
 
 const configTabLabels: Record<ConfigTabType, string> = {
-  gemini_api: "Gemini",
   vertex: "Vertex AI",
   amp: "Amp CLI",
+  gemini_api_key: "Gemini API Key",
 };
 
 // 判断是否为配置类型 tab
 const isConfigTab = (tab: TabType): tab is ConfigTabType => {
-  return ["gemini_api", "vertex", "amp"].includes(tab);
+  return ["vertex", "amp", "gemini_api_key"].includes(tab);
 };
 
 // 分类类型
@@ -488,10 +489,10 @@ export const ProviderPoolPage = forwardRef<ProviderPoolPageRef>(
             })}
             {/* Gemini API Key - 配置文件存储但归类到 API Key */}
             <button
-              onClick={() => setActiveTab("gemini_api")}
+              onClick={() => setActiveTab("gemini_api_key")}
               title="Gemini API Key"
               className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                activeTab === "gemini_api"
+                activeTab === "gemini_api_key"
                   ? "border-primary bg-primary/10 text-primary shadow-sm"
                   : "border-border bg-card hover:border-primary/50 hover:bg-muted text-muted-foreground hover:text-foreground"
               }`}
@@ -501,7 +502,7 @@ export const ProviderPoolPage = forwardRef<ProviderPoolPageRef>(
               {(config?.credential_pool?.gemini_api_keys?.length ?? 0) > 0 && (
                 <span
                   className={`min-w-[1.25rem] h-5 flex items-center justify-center rounded-full text-xs font-medium ${
-                    activeTab === "gemini_api"
+                    activeTab === "gemini_api_key"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted-foreground/20 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
                   }`}
@@ -541,7 +542,7 @@ export const ProviderPoolPage = forwardRef<ProviderPoolPageRef>(
             </div>
           ) : config ? (
             <div className="space-y-4">
-              {activeTab === "gemini_api" && (
+              {activeTab === "gemini_api_key" && (
                 <>
                   <GeminiApiKeySection
                     entries={config.credential_pool?.gemini_api_keys ?? []}

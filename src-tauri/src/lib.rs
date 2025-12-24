@@ -2014,6 +2014,7 @@ pub fn run() {
             commands::provider_pool_cmd::add_antigravity_oauth_credential,
             commands::provider_pool_cmd::add_openai_key_credential,
             commands::provider_pool_cmd::add_claude_key_credential,
+            commands::provider_pool_cmd::add_gemini_api_key_credential,
             commands::provider_pool_cmd::add_codex_oauth_credential,
             commands::provider_pool_cmd::add_claude_oauth_credential,
             commands::provider_pool_cmd::add_iflow_oauth_credential,

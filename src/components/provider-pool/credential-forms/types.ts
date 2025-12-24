@@ -56,4 +56,5 @@ export const providerLabels: Record<PoolProviderType, string> = {
   codex: "Codex (OpenAI OAuth)",
   claude_oauth: "Claude OAuth",
   iflow: "iFlow",
+  gemini_api_key: "Gemini API Key",
 };
