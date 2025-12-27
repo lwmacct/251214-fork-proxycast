@@ -612,10 +612,21 @@ pub fn add_kiro_oauth_credential(
     creds_file_path: String,
     name: Option<String>,
 ) -> Result<ProviderCredential, String> {
-    // 复制并重命名文件到应用存储目录
-    let stored_file_path = copy_and_rename_credential_file(&creds_file_path, "kiro")?;
+    tracing::info!("[KIRO] 开始添加凭证，文件路径: {}", creds_file_path);
 
-    pool_service.0.add_credential(
+    // 复制并重命名文件到应用存储目录
+    let stored_file_path = match copy_and_rename_credential_file(&creds_file_path, "kiro") {
+        Ok(path) => {
+            tracing::info!("[KIRO] 凭证文件已复制到: {}", path);
+            path
+        }
+        Err(e) => {
+            tracing::error!("[KIRO] 复制凭证文件失败: {}", e);
+            return Err(e);
+        }
+    };
+
+    match pool_service.0.add_credential(
         &db,
         "kiro",
         CredentialData::KiroOAuth {
@@ -624,7 +635,16 @@ pub fn add_kiro_oauth_credential(
         name,
         Some(true),
         None,
-    )
+    ) {
+        Ok(cred) => {
+            tracing::info!("[KIRO] 凭证添加成功，UUID: {}", cred.uuid);
+            Ok(cred)
+        }
+        Err(e) => {
+            tracing::error!("[KIRO] 添加凭证到数据库失败: {}", e);
+            Err(e)
+        }
+    }
 }
 
 /// 从 JSON 内容创建 Kiro 凭证文件并添加到凭证池
@@ -789,10 +809,24 @@ pub fn add_kiro_from_json(
     json_content: String,
     name: Option<String>,
 ) -> Result<ProviderCredential, String> {
-    // 从 JSON 内容创建凭证文件
-    let stored_file_path = create_kiro_credential_from_json(&json_content)?;
+    tracing::info!(
+        "[KIRO] 开始从 JSON 添加凭证，内容长度: {}",
+        json_content.len()
+    );
 
-    pool_service.0.add_credential(
+    // 从 JSON 内容创建凭证文件
+    let stored_file_path = match create_kiro_credential_from_json(&json_content) {
+        Ok(path) => {
+            tracing::info!("[KIRO] 凭证文件已创建: {}", path);
+            path
+        }
+        Err(e) => {
+            tracing::error!("[KIRO] 创建凭证文件失败: {}", e);
+            return Err(e);
+        }
+    };
+
+    match pool_service.0.add_credential(
         &db,
         "kiro",
         CredentialData::KiroOAuth {
@@ -801,7 +835,16 @@ pub fn add_kiro_from_json(
         name,
         Some(true),
         None,
-    )
+    ) {
+        Ok(cred) => {
+            tracing::info!("[KIRO] 凭证添加成功，UUID: {}", cred.uuid);
+            Ok(cred)
+        }
+        Err(e) => {
+            tracing::error!("[KIRO] 添加凭证到数据库失败: {}", e);
+            Err(e)
+        }
+    }
 }
 
 /// 添加 Gemini OAuth 凭证（通过文件路径）
