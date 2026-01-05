@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::agent::NativeAgentState;
 use crate::commands::api_key_provider_cmd::ApiKeyProviderServiceState;
+use crate::commands::connect_cmd::ConnectStateWrapper;
 use crate::commands::flow_monitor_cmd::{
     BatchOperationsState, BookmarkManagerState, EnhancedStatsServiceState, FlowInterceptorState,
     FlowMonitorState, FlowQueryServiceState, FlowReplayerState, QuickFilterManagerState,
@@ -130,6 +131,7 @@ pub struct AppStates {
     pub native_agent: NativeAgentState,
     pub oauth_plugin_manager: crate::commands::oauth_plugin_cmd::OAuthPluginManagerState,
     pub orchestrator: OrchestratorState,
+    pub connect_state: ConnectStateWrapper,
     // 用于 setup hook 的共享实例
     pub shared_stats: Arc<parking_lot::RwLock<telemetry::StatsAggregator>>,
     pub shared_tokens: Arc<parking_lot::RwLock<telemetry::TokenTracker>>,
@@ -202,6 +204,9 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
         crate::commands::oauth_plugin_cmd::OAuthPluginManagerState::with_defaults();
     let orchestrator_state = OrchestratorState::new();
 
+    // 初始化 Connect 状态（延迟初始化，在 setup hook 中完成）
+    let connect_state = ConnectStateWrapper(Arc::new(RwLock::new(None)));
+
     // 初始化默认技能仓库
     {
         let conn = db.lock().expect("Failed to lock database");
@@ -236,6 +241,7 @@ pub fn init_states(config: &Config) -> Result<AppStates, String> {
         native_agent: native_agent_state,
         oauth_plugin_manager: oauth_plugin_manager_state,
         orchestrator: orchestrator_state,
+        connect_state,
         shared_stats,
         shared_tokens,
         shared_logger,

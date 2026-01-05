@@ -5,7 +5,7 @@
  * 支持静态页面和动态插件页面路由
  * 包含启动画面和全局图标侧边栏
  *
- * _需求: 2.2, 3.2_
+ * _需求: 2.2, 3.2, 5.2_
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -22,6 +22,10 @@ import { PluginsPage } from "./components/plugins/PluginsPage";
 import { Toaster } from "./components/ui/sonner";
 import { flowEventManager } from "./lib/flowEventManager";
 import { OnboardingWizard, useOnboardingState } from "./components/onboarding";
+import { ConnectConfirmDialog } from "./components/connect";
+import { showRegistryLoadError } from "./lib/utils/connectError";
+import { useDeepLink } from "./hooks/useDeepLink";
+import { useRelayRegistry } from "./hooks/useRelayRegistry";
 
 /**
  * 页面类型定义
@@ -67,10 +71,40 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>("agent");
   const { needsOnboarding, completeOnboarding } = useOnboardingState();
 
+  // Deep Link 处理 Hook
+  // _Requirements: 5.2_
+  const {
+    connectPayload,
+    relayInfo,
+    isVerified,
+    isDialogOpen,
+    isSaving,
+    error,
+    handleConfirm,
+    handleCancel,
+  } = useDeepLink();
+
+  // Relay Registry 管理 Hook
+  // _Requirements: 2.1, 7.2, 7.3_
+  const {
+    error: registryError,
+    refresh: _refreshRegistry, // 保留以供后续错误处理 UI 使用
+  } = useRelayRegistry();
+
   // 在应用启动时初始化 Flow 事件订阅
   useEffect(() => {
     flowEventManager.subscribe();
   }, []);
+
+  // 处理 Registry 加载失败
+  // _Requirements: 7.2, 7.3_
+  useEffect(() => {
+    if (registryError) {
+      console.warn("[App] Registry 加载失败:", registryError);
+      // 显示 toast 通知用户
+      showRegistryLoadError(registryError.message);
+    }
+  }, [registryError]);
 
   // 页面切换时重置滚动位置
   useEffect(() => {
@@ -181,6 +215,20 @@ function App() {
       <AppSidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <MainContent>{renderPage()}</MainContent>
       <Toaster />
+      {/* ProxyCast Connect 确认弹窗 */}
+      {/* _Requirements: 5.2_ */}
+      <ConnectConfirmDialog
+        open={isDialogOpen}
+        relay={relayInfo}
+        relayId={connectPayload?.relay ?? ""}
+        apiKey={connectPayload?.key ?? ""}
+        keyName={connectPayload?.name}
+        isVerified={isVerified}
+        isSaving={isSaving}
+        error={error}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </AppContainer>
   );
 }

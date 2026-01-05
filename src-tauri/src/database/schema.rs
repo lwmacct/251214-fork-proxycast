@@ -450,6 +450,31 @@ pub fn create_tables(conn: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
+    // ============================================================================
+    // ProxyCast Connect 相关表
+    // ============================================================================
+
+    // Relay API Keys 表
+    // 存储中转商 API Key
+    // _Requirements: 4.1, 4.3_
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS relay_api_keys (
+            id TEXT PRIMARY KEY,
+            relay_id TEXT NOT NULL,
+            api_key TEXT NOT NULL,
+            name TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )",
+        [],
+    )?;
+
+    // 创建 relay_api_keys 索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_relay_api_keys_relay_id ON relay_api_keys(relay_id)",
+        [],
+    )?;
+
     Ok(())
 }
 

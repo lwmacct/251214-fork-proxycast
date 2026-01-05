@@ -124,6 +124,19 @@ curl http://127.0.0.1:8999/v1/chat/completions \
   </a>
 </div>
 
+## 🌐 开放平台
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-8">
+  <a href="/open-platform/overview" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">🔌 插件系统</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">通过插件扩展 ProxyCast 功能，支持工具类、Hook 类等多种插件类型</p>
+  </a>
+  <a href="/open-platform/connect" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">🔗 ProxyCast Connect</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">中转商生态合作方案，一键配置 API Key，提升用户转化率</p>
+  </a>
+</div>
+
 ## 🤝 社区与支持
 
 - **GitHub Issues**: [报告问题](https://github.com/aiclientproxy/proxycast/issues)

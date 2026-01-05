@@ -7,6 +7,7 @@ pub mod agent;
 pub mod app;
 pub mod backends;
 pub mod browser_interceptor;
+pub mod connect;
 pub mod credential;
 pub mod database;
 pub mod flow_monitor;

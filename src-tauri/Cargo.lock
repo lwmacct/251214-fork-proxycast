@@ -3692,6 +3692,7 @@ dependencies = [
  "fs2",
  "futures",
  "glob",
+ "hex",
  "indexmap 2.12.1",
  "md5",
  "notify",

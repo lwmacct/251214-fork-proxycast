@@ -11,6 +11,8 @@ React 自定义 Hooks，封装业务逻辑和状态管理。
 
 - `index.ts` - Hooks 导出入口
 - `useApiKeyProvider.ts` - API Key Provider 管理 Hook（Requirements 9.1）
+- `useConnectCallback.ts` - Connect 统计回调 Hook（Requirements 5.3）
+- `useDeepLink.ts` - Deep Link 事件处理 Hook（Requirements 5.1, 5.2, 5.3, 5.4）
 - `useErrorHandler.ts` - 错误处理 Hook
 - `useFileMonitoring.ts` - 文件监控 Hook
 - `useFlowActions.ts` - 流量操作 Hook
@@ -21,6 +23,7 @@ React 自定义 Hooks，封装业务逻辑和状态管理。
 - `usePrompts.ts` - Prompt 管理 Hook
 - `useProviderPool.ts` - Provider 池管理 Hook
 - `useProviderState.ts` - Provider 状态 Hook
+- `useRelayRegistry.ts` - Relay Registry 管理 Hook（Requirements 2.1, 7.2, 7.3）
 - `useSkills.ts` - 技能管理 Hook
 - `useSwitch.ts` - 开关状态 Hook
 - `useTauri.ts` - Tauri 通用 Hook

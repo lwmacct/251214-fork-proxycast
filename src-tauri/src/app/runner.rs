@@ -3,7 +3,7 @@
 //! 包含 Tauri 应用的主入口函数和命令注册。
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Listener, Manager};
 
 use crate::commands;
 use crate::tray::{TrayIconStatus, TrayManager, TrayStateSnapshot};
@@ -70,6 +70,7 @@ pub fn run() {
         native_agent: native_agent_state,
         oauth_plugin_manager: oauth_plugin_manager_state,
         orchestrator: orchestrator_state,
+        connect_state: connect_state,
         shared_stats,
         shared_tokens,
         shared_logger,
@@ -95,7 +96,16 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
-        ))
+        ));
+
+    // 在 macOS 上注册 Deep Link 插件
+    // _Requirements: 1.4_
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+    }
+
+    builder = builder
         // 单实例插件：当第二个实例启动时，将 URL 传递给第一个实例
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             tracing::info!("[单实例] 收到来自新实例的参数: {:?}", args);
@@ -134,6 +144,7 @@ pub fn run() {
         .manage(native_agent_state)
         .manage(oauth_plugin_manager_state)
         .manage(orchestrator_state)
+        .manage(connect_state)
         .on_window_event(move |window, event| {
             // 处理窗口关闭事件
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -178,6 +189,128 @@ pub fn run() {
                     app.manage(tray_state);
                 }
             }
+
+            // 初始化 Connect 状态
+            // _Requirements: 1.4, 2.1_
+            {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // 获取应用数据目录
+                    let app_data_dir = dirs::data_dir()
+                        .unwrap_or_else(|| std::path::PathBuf::from("."))
+                        .join("proxycast");
+
+                    // 初始化 Connect 状态
+                    match crate::commands::connect_cmd::init_connect_state(app_data_dir).await {
+                        Ok(connect_state_inner) => {
+                            tracing::info!("[启动] Connect 模块初始化成功");
+                            // 更新状态
+                            if let Some(state) = app_handle
+                                .try_state::<crate::commands::connect_cmd::ConnectStateWrapper>()
+                            {
+                                let mut guard = state.0.write().await;
+                                *guard = Some(connect_state_inner);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("[启动] Connect 模块初始化失败: {:?}", e);
+                        }
+                    }
+                });
+            }
+
+            // 注册 Deep Link 事件处理器（仅 macOS）
+            // _Requirements: 1.4_
+            #[cfg(target_os = "macos")]
+            {
+                let app_handle = app.handle().clone();
+                app.listen("deep-link://new-url", move |event| {
+                    let urls = event.payload().to_string();
+                    tracing::info!("[Deep Link] 收到 URL: {}", urls);
+                    // 解析 URL 并处理
+                    let app_handle_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                            // 尝试解析为 JSON 数组（Tauri deep-link 插件返回的格式）
+                            if let Ok(url_list) = serde_json::from_str::<Vec<String>>(&urls) {
+                                for url in url_list {
+                                    if url.starts_with("proxycast://connect") {
+                                        // 调用 handle_deep_link 命令
+                                        if let Some(state) = app_handle_clone
+                                            .try_state::<crate::commands::connect_cmd::ConnectStateWrapper>()
+                                        {
+                                            match crate::connect::parse_deep_link(&url) {
+                                                Ok(payload) => {
+                                                    // 查询中转商信息
+                                                    let (relay_info, is_verified) = {
+                                                        let state_guard = state.0.read().await;
+                                                        if let Some(connect_state) = state_guard.as_ref() {
+                                                            let info = connect_state.registry.get(&payload.relay);
+                                                            let verified = info.is_some();
+                                                            (info, verified)
+                                                        } else {
+                                                            (None, false)
+                                                        }
+                                                    };
+
+                                                    let result = crate::commands::connect_cmd::DeepLinkResult {
+                                                        payload,
+                                                        relay_info,
+                                                        is_verified,
+                                                    };
+
+                                                    // 发送事件到前端
+                                                    if let Err(e) = app_handle_clone.emit("deep-link-connect", &result) {
+                                                        tracing::error!("[Deep Link] 发送事件失败: {}", e);
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("[Deep Link] 解析 URL 失败: {:?}", e);
+                                                    // 发送错误事件到前端
+                                                    let _ = app_handle_clone.emit("deep-link-error", &format!("{:?}", e));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if urls.starts_with("proxycast://connect") {
+                                // 直接处理单个 URL
+                                if let Some(state) = app_handle_clone
+                                    .try_state::<crate::commands::connect_cmd::ConnectStateWrapper>()
+                                {
+                                    match crate::connect::parse_deep_link(&urls) {
+                                        Ok(payload) => {
+                                            let (relay_info, is_verified) = {
+                                                let state_guard = state.0.read().await;
+                                                if let Some(connect_state) = state_guard.as_ref() {
+                                                    let info = connect_state.registry.get(&payload.relay);
+                                                    let verified = info.is_some();
+                                                    (info, verified)
+                                                } else {
+                                                    (None, false)
+                                                }
+                                            };
+
+                                            let result = crate::commands::connect_cmd::DeepLinkResult {
+                                                payload,
+                                                relay_info,
+                                                is_verified,
+                                            };
+
+                                            if let Err(e) = app_handle_clone.emit("deep-link-connect", &result) {
+                                                tracing::error!("[Deep Link] 发送事件失败: {}", e);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("[Deep Link] 解析 URL 失败: {:?}", e);
+                                            let _ = app_handle_clone.emit("deep-link-error", &format!("{:?}", e));
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                });
+            }
+
             // 自动启动服务器
             let state = state_clone.clone();
             let logs = logs_clone.clone();
@@ -843,6 +976,14 @@ pub fn run() {
             commands::orchestrator_cmd::list_strategies,
             commands::orchestrator_cmd::list_service_tiers,
             commands::orchestrator_cmd::list_task_hints,
+            // Connect commands
+            // _Requirements: 1.4, 2.3, 4.1, 5.3_
+            commands::connect_cmd::handle_deep_link,
+            commands::connect_cmd::get_relay_info,
+            commands::connect_cmd::save_relay_api_key,
+            commands::connect_cmd::refresh_relay_registry,
+            commands::connect_cmd::list_relay_providers,
+            commands::connect_cmd::send_connect_callback,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
