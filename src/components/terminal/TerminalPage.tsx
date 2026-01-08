@@ -1,16 +1,14 @@
 /**
  * @file TerminalPage.tsx
- * @description 内置终端页面组件 - 后端预创建架构
+ * @description 内置终端页面组件 - 对齐 waveterm 单容器架构
  * @module components/terminal/TerminalPage
  *
- * ## 架构说明
- * PTY 在后端预创建，前端只负责连接。
- * 新建终端时先调用后端创建会话，成功后再创建 UI 组件。
+ * ## 架构说明（对齐 waveterm）
+ * - 只有一个 term-connectelem（终端容器）
+ * - 切换标签页时，销毁旧的 TermWrap，创建新的 TermWrap
+ * - 这样可以避免多个终端容器导致的布局问题
  *
- * ## 功能特性
- * - 多标签页管理
- * - 终端搜索 (Ctrl+F)
- * - 主题切换
+ * _Requirements: 8.7, 8.8, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -27,6 +25,10 @@ import {
   getThemeList,
   saveThemePreference,
   loadThemePreference,
+  saveFontSizePreference,
+  loadFontSizePreference,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
 } from "@/lib/terminal/themes";
 import "./terminal.css";
 
@@ -153,7 +155,9 @@ const SearchButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   </button>
 );
 
-/** 主题选择器 */
+/** 主题选择器
+ * _Requirements: 12.1, 12.4_
+ */
 const ThemeSelector: React.FC<{
   currentTheme: ThemeName;
   onThemeChange: (theme: ThemeName) => void;
@@ -216,6 +220,67 @@ const ThemeSelector: React.FC<{
   );
 };
 
+/** 字体大小调整器
+ * _Requirements: 8.8_
+ */
+const FontSizeControl: React.FC<{
+  fontSize: number;
+  onFontSizeChange: (size: number) => void;
+}> = ({ fontSize, onFontSizeChange }) => {
+  const handleDecrease = () => {
+    if (fontSize > MIN_FONT_SIZE) {
+      onFontSizeChange(fontSize - 1);
+    }
+  };
+
+  const handleIncrease = () => {
+    if (fontSize < MAX_FONT_SIZE) {
+      onFontSizeChange(fontSize + 1);
+    }
+  };
+
+  return (
+    <div className="terminal-font-size-control">
+      <button
+        className="terminal-font-size-btn"
+        onClick={handleDecrease}
+        disabled={fontSize <= MIN_FONT_SIZE}
+        title="减小字体 (Ctrl+-)"
+      >
+        <svg
+          className="w-3 h-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+      <span className="terminal-font-size-value" title="字体大小">
+        {fontSize}
+      </span>
+      <button
+        className="terminal-font-size-btn"
+        onClick={handleIncrease}
+        disabled={fontSize >= MAX_FONT_SIZE}
+        title="增大字体 (Ctrl++)"
+      >
+        <svg
+          className="w-3 h-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
 /** 标签页组件 */
 const TabItem: React.FC<{
   tab: Tab;
@@ -256,6 +321,8 @@ const TerminalTabs: React.FC<{
   onSearchClick: () => void;
   currentTheme: ThemeName;
   onThemeChange: (theme: ThemeName) => void;
+  fontSize: number;
+  onFontSizeChange: (size: number) => void;
   isCreating?: boolean;
 }> = ({
   tabs,
@@ -266,6 +333,8 @@ const TerminalTabs: React.FC<{
   onSearchClick,
   currentTheme,
   onThemeChange,
+  fontSize,
+  onFontSizeChange,
   isCreating,
 }) => (
   <div className="terminal-tabbar" role="tablist">
@@ -281,6 +350,7 @@ const TerminalTabs: React.FC<{
       ))}
     </div>
     <SearchButton onClick={onSearchClick} />
+    <FontSizeControl fontSize={fontSize} onFontSizeChange={onFontSizeChange} />
     <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
     <NewTabButton onClick={onNewTab} disabled={isCreating} />
   </div>
@@ -305,99 +375,7 @@ const EmptyTabsPlaceholder: React.FC<{
 );
 
 // ============================================================================
-// 终端视图组件 - 连接模式
-// ============================================================================
-
-interface TerminalViewProps {
-  /** 会话 ID（必须） */
-  sessionId: string;
-  /** 状态变化回调 */
-  onStatusChange: (status: SessionStatus) => void;
-  /** 是否自动聚焦 */
-  autoFocus?: boolean;
-  /** 是否可见（用于多标签页切换） */
-  visible?: boolean;
-  /** 主题名称 */
-  themeName?: ThemeName;
-  /** TermWrap 引用回调 */
-  onTermWrapRef?: (termWrap: TermWrap | null) => void;
-}
-
-const TerminalView: React.FC<TerminalViewProps> = ({
-  sessionId,
-  onStatusChange,
-  autoFocus,
-  visible = true,
-  themeName,
-  onTermWrapRef,
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termWrapRef = useRef<TermWrap | null>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const callbacksRef = useRef({ onStatusChange, onTermWrapRef });
-  callbacksRef.current = { onStatusChange, onTermWrapRef };
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // 创建 TermWrap 实例
-    const termWrap = new TermWrap(sessionId, container, {
-      onStatusChange: (status) => callbacksRef.current.onStatusChange(status),
-      themeName,
-    });
-
-    termWrapRef.current = termWrap;
-    callbacksRef.current.onTermWrapRef?.(termWrap);
-
-    // 设置 ResizeObserver
-    const rszObs = new ResizeObserver(() => {
-      termWrap.handleResize_debounced();
-    });
-    rszObs.observe(container);
-    resizeObserverRef.current = rszObs;
-
-    // 自动聚焦
-    if (autoFocus) {
-      setTimeout(() => termWrap.focus(), 10);
-    }
-
-    return () => {
-      termWrap.dispose();
-      rszObs.disconnect();
-      callbacksRef.current.onTermWrapRef?.(null);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
-
-  // 主题变化时更新
-  useEffect(() => {
-    if (themeName && termWrapRef.current) {
-      termWrapRef.current.setTheme(themeName);
-    }
-  }, [themeName]);
-
-  // 当可见性变化时，触发 resize 和聚焦
-  useEffect(() => {
-    if (visible && termWrapRef.current) {
-      termWrapRef.current.handleResize_debounced();
-      if (autoFocus) {
-        termWrapRef.current.focus();
-      }
-    }
-  }, [visible, autoFocus, themeName]);
-
-  return (
-    <div
-      ref={containerRef}
-      className={`terminal-container ${visible ? "" : "terminal-hidden"}`}
-      onClick={() => termWrapRef.current?.focus()}
-    />
-  );
-};
-
-// ============================================================================
-// 主组件
+// 主组件 - 对齐 waveterm 单容器架构
 // ============================================================================
 
 export function TerminalPage() {
@@ -409,45 +387,23 @@ export function TerminalPage() {
   const [currentTheme, setCurrentTheme] = useState<ThemeName>(
     loadThemePreference(),
   );
+  // 字体大小状态
+  // _Requirements: 8.8_
+  const [fontSize, setFontSize] = useState<number>(loadFontSizePreference());
   const tabIdCounter = useRef(0);
-  const termWrapRefs = useRef<Map<string, TermWrap>>(new Map());
-  const pageRef = useRef<HTMLDivElement>(null);
 
-  // 调试：打印布局链高度
-  useEffect(() => {
-    if (pageRef.current) {
-      let el: HTMLElement | null = pageRef.current;
-      const heights: string[] = [];
-      while (el) {
-        const style = window.getComputedStyle(el);
-        heights.push(
-          `${el.className?.slice(0, 30) || el.tagName}: ${style.height}`,
-        );
-        el = el.parentElement;
-      }
-      console.log("[TerminalPage] 布局链高度:", heights);
-    }
-  }, [tabs.length]);
+  // 单一终端容器引用（对齐 waveterm 的 connectElemRef）
+  const connectElemRef = useRef<HTMLDivElement>(null);
+  // 当前 TermWrap 实例引用（对齐 waveterm 的 model.termRef）
+  const termWrapRef = useRef<TermWrap | null>(null);
+
+  // 获取当前活动的标签页
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   // 获取当前活动的 TermWrap
   const getActiveTermWrap = useCallback(() => {
-    if (!activeTabId) return null;
-    const tab = tabs.find((t) => t.id === activeTabId);
-    if (!tab) return null;
-    return termWrapRefs.current.get(tab.sessionId) ?? null;
-  }, [activeTabId, tabs]);
-
-  // 处理 TermWrap 引用
-  const handleTermWrapRef = useCallback(
-    (sessionId: string, termWrap: TermWrap | null) => {
-      if (termWrap) {
-        termWrapRefs.current.set(sessionId, termWrap);
-      } else {
-        termWrapRefs.current.delete(sessionId);
-      }
-    },
-    [],
-  );
+    return termWrapRef.current;
+  }, []);
 
   // 创建新终端
   const handleNewTerminal = useCallback(async () => {
@@ -521,10 +477,21 @@ export function TerminalPage() {
   const handleThemeChange = useCallback((theme: ThemeName) => {
     setCurrentTheme(theme);
     saveThemePreference(theme);
-    // 更新所有终端的主题
-    termWrapRefs.current.forEach((termWrap) => {
-      termWrap.setTheme(theme);
-    });
+    // 更新当前终端的主题
+    if (termWrapRef.current) {
+      termWrapRef.current.setTheme(theme);
+    }
+  }, []);
+
+  // 字体大小变化
+  // _Requirements: 8.8_
+  const handleFontSizeChange = useCallback((size: number) => {
+    setFontSize(size);
+    saveFontSizePreference(size);
+    // 更新当前终端的字体大小
+    if (termWrapRef.current) {
+      termWrapRef.current.setFontSize(size);
+    }
   }, []);
 
   // 搜索功能
@@ -570,11 +537,28 @@ export function TerminalPage() {
         e.preventDefault();
         setShowSearch(true);
       }
+      // Ctrl++ 或 Ctrl+= 增大字体
+      // _Requirements: 8.8_
+      if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        handleFontSizeChange(Math.min(fontSize + 1, MAX_FONT_SIZE));
+      }
+      // Ctrl+- 减小字体
+      // _Requirements: 8.8_
+      if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+        e.preventDefault();
+        handleFontSizeChange(Math.max(fontSize - 1, MIN_FONT_SIZE));
+      }
+      // Ctrl+0 重置字体大小
+      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        handleFontSizeChange(14);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [fontSize, handleFontSizeChange]);
 
   // 清除错误
   useEffect(() => {
@@ -583,6 +567,173 @@ export function TerminalPage() {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // 首次挂载时自动创建一个终端
+  useEffect(() => {
+    if (tabs.length === 0 && !isCreating) {
+      handleNewTerminal();
+    }
+    // 只在首次挂载时执行
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ============================================================================
+  // 核心：当活动标签页变化时，重新创建 TermWrap（对齐 waveterm）
+  // ============================================================================
+
+  // 键盘事件处理器（对齐 waveterm 的 handleTerminalKeydown）
+  // 返回 true = 允许事件传递到终端
+  // 返回 false = 阻止事件传递到终端（已处理）
+  const handleTerminalKeydown = useCallback((e: KeyboardEvent): boolean => {
+    // 只处理 keydown 事件
+    if (e.type !== "keydown") {
+      return true;
+    }
+
+    const termWrap = termWrapRef.current;
+    if (!termWrap) return true;
+
+    const isMac = /mac/i.test(navigator.userAgent);
+
+    // Shift+End - 滚动到底部
+    if (
+      e.shiftKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      e.key === "End"
+    ) {
+      termWrap.terminal.scrollToBottom();
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // Shift+Home - 滚动到顶部
+    if (
+      e.shiftKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      e.key === "Home"
+    ) {
+      termWrap.terminal.scrollToLine(0);
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // Cmd+End (macOS) - 滚动到底部
+    if (
+      isMac &&
+      e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.key === "End"
+    ) {
+      termWrap.terminal.scrollToBottom();
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // Cmd+Home (macOS) - 滚动到顶部
+    if (
+      isMac &&
+      e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.key === "Home"
+    ) {
+      termWrap.terminal.scrollToLine(0);
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // Shift+PageDown - 向下滚动一页
+    if (
+      e.shiftKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      e.key === "PageDown"
+    ) {
+      termWrap.terminal.scrollPages(1);
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // Shift+PageUp - 向上滚动一页
+    if (
+      e.shiftKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      e.key === "PageUp"
+    ) {
+      termWrap.terminal.scrollPages(-1);
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+
+    // 未处理的事件，允许传递到终端
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const container = connectElemRef.current;
+    if (!container || !activeTab) {
+      // 没有活动标签页，清理旧的 TermWrap
+      if (termWrapRef.current) {
+        termWrapRef.current.dispose();
+        termWrapRef.current = null;
+      }
+      return;
+    }
+
+    // 销毁旧的 TermWrap
+    if (termWrapRef.current) {
+      termWrapRef.current.dispose();
+      termWrapRef.current = null;
+    }
+
+    // 清空容器
+    container.innerHTML = "";
+
+    // 创建新的 TermWrap（对齐 waveterm）
+    const termWrap = new TermWrap(activeTab.sessionId, container, {
+      onStatusChange: (status) => handleStatusChange(activeTab.id, status),
+      themeName: currentTheme,
+      fontSize: fontSize,
+      keydownHandler: handleTerminalKeydown,
+    });
+
+    termWrapRef.current = termWrap;
+
+    // 设置 ResizeObserver（对齐 waveterm）
+    const rszObs = new ResizeObserver(() => {
+      termWrap.handleResize_debounced();
+    });
+    rszObs.observe(container);
+
+    // 异步初始化终端（对齐 waveterm 的 fireAndForget）
+    termWrap.initTerminal().catch(console.error);
+
+    // 自动聚焦
+    setTimeout(() => termWrap.focus(), 10);
+
+    return () => {
+      termWrap.dispose();
+      rszObs.disconnect();
+    };
+    // 注意：handleTerminalKeydown 使用 useCallback 且无依赖，不会导致重新创建
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.sessionId, currentTheme, fontSize, handleStatusChange]);
 
   // 没有标签页时显示空状态
   if (tabs.length === 0) {
@@ -597,6 +748,8 @@ export function TerminalPage() {
           onSearchClick={() => setShowSearch(true)}
           currentTheme={currentTheme}
           onThemeChange={handleThemeChange}
+          fontSize={fontSize}
+          onFontSizeChange={handleFontSizeChange}
           isCreating={isCreating}
         />
         <div className="flex-1">
@@ -615,10 +768,7 @@ export function TerminalPage() {
   }
 
   return (
-    <div
-      ref={pageRef}
-      className="flex flex-col w-full h-full overflow-hidden relative terminal-bg"
-    >
+    <div className="view-term terminal-bg">
       {/* 标签栏 */}
       <TerminalTabs
         tabs={tabs}
@@ -629,6 +779,8 @@ export function TerminalPage() {
         onSearchClick={() => setShowSearch(true)}
         currentTheme={currentTheme}
         onThemeChange={handleThemeChange}
+        fontSize={fontSize}
+        onFontSizeChange={handleFontSizeChange}
         isCreating={isCreating}
       />
 
@@ -642,24 +794,12 @@ export function TerminalPage() {
         onClearSearch={handleClearSearch}
       />
 
-      {/* 终端视图 - 只渲染当前活动的终端（参考 waveterm） */}
-      <div className="flex-1 min-h-0 relative flex flex-col">
-        {tabs
-          .filter((tab) => tab.id === activeTabId)
-          .map((tab) => (
-            <TerminalView
-              key={tab.id}
-              sessionId={tab.sessionId}
-              onStatusChange={(status) => handleStatusChange(tab.id, status)}
-              visible={true}
-              autoFocus={true}
-              themeName={currentTheme}
-              onTermWrapRef={(termWrap) =>
-                handleTermWrapRef(tab.sessionId, termWrap)
-              }
-            />
-          ))}
-      </div>
+      {/* 单一终端容器（对齐 waveterm 的 term-connectelem） */}
+      <div
+        ref={connectElemRef}
+        className="term-connectelem"
+        onClick={() => termWrapRef.current?.focus()}
+      />
 
       {/* 错误提示 */}
       {error && (
@@ -670,5 +810,4 @@ export function TerminalPage() {
     </div>
   );
 }
-
 export default TerminalPage;

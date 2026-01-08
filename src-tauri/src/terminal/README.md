@@ -11,6 +11,7 @@
 - PTY 使用默认大小 (24x80) 预创建
 - 前端连接后通过 resize 同步实际大小
 - 通过 Tauri Commands 和 Events 暴露给前端
+- 统一的 BlockController 抽象层支持多种连接类型
 
 ## 核心功能
 
@@ -18,15 +19,38 @@
 - **会话管理**: 多会话支持，生命周期管理
 - **实时输出**: 通过 Tauri Events 推送终端输出
 - **状态通知**: 会话状态变化事件
+- **持久化存储**: 块文件循环缓冲存储、会话元数据 SQLite 存储
+- **块控制器**: 统一的控制器抽象层（Shell、Cmd、SSH、WSL）
+- **连接管理**: 本地 PTY、SSH、WSL 连接支持
+- **Shell 集成**: OSC 序列解析、状态重同步、命令跟踪
 
 ## 文件索引
 
 - `mod.rs` - 模块入口和类型导出
 - `error.rs` - 错误类型定义
-- `events.rs` - Tauri 事件定义（terminal:output, terminal:status）
+- `events.rs` - Tauri 事件定义（terminal:output, terminal:status, terminal:shell-integration）
 - `pty_session.rs` - PTY 会话封装（支持默认大小创建）
 - `session_manager.rs` - 会话管理器
 - `tests.rs` - 单元测试
+- `block_controller/` - 块控制器模块
+  - `mod.rs` - 模块入口
+  - `traits.rs` - BlockController trait 定义
+  - `registry.rs` - 控制器注册表
+  - `shell_controller.rs` - Shell/Cmd 控制器实现
+- `connections/` - 连接模块
+  - `mod.rs` - 模块入口
+  - `local_pty.rs` - 本地 PTY 连接（ShellProc）
+  - `ssh_connection.rs` - SSH 远程连接（待实现）
+  - `wsl_connection.rs` - WSL 连接（待实现）
+- `integration/` - 集成模块
+  - `mod.rs` - 模块入口
+  - `resync.rs` - 状态重同步控制器
+  - `osc_parser.rs` - OSC 序列解析器（OSC 7/52/133/16162）
+  - `shell_integration.rs` - Shell 集成处理器（状态管理、命令跟踪）
+- `persistence/` - 持久化存储模块
+  - `mod.rs` - 模块入口
+  - `block_file.rs` - 块文件循环缓冲存储
+  - `session_store.rs` - 会话元数据 SQLite 存储
 
 ## 命令接口
 
@@ -45,15 +69,22 @@
 |--------|------|----------|
 | `terminal:output` | 终端输出数据 | `{ session_id, data }` |
 | `terminal:status` | 会话状态变化 | `{ session_id, status, exit_code?, error? }` |
+| `terminal:shell-integration` | Shell 集成状态变化 | `{ block_id, status, current_dir?, command_info? }` |
+| `terminal:clipboard-write` | 剪贴板写入请求 | `{ block_id, selection, content }` |
+| `controller:status` | 控制器状态变化 | `{ block_id, version, shell_proc_status, ... }` |
 
 ## 常量
 
 - `DEFAULT_ROWS`: 默认终端行数 (24)
 - `DEFAULT_COLS`: 默认终端列数 (80)
+- `DEFAULT_TERM_MAX_FILE_SIZE`: 默认块文件最大大小 (256KB)
+- `TERMINAL_RESET_SEQUENCE`: 终端完全重置序列
+- `TERMINAL_SOFT_RESET_SEQUENCE`: 终端软重置序列
 
 ## 依赖
 
 - `portable-pty` - 跨平台 PTY 支持
+- `rusqlite` - SQLite 数据库支持
 
 ## 更新提醒
 

@@ -15,6 +15,15 @@ interface ITerminalDimensions {
   cols: number;
 }
 
+interface IRenderDimensions {
+  css: {
+    cell: {
+      width: number;
+      height: number;
+    };
+  };
+}
+
 const MINIMUM_COLS = 2;
 const MINIMUM_ROWS = 1;
 
@@ -38,12 +47,7 @@ export class FitAddon implements ITerminalAddon {
     // 访问 xterm 内部 API
     const core = (this._terminal as any)._core;
 
-    // 安全检查：确保内部 API 可用
-    if (!core || !core._renderService) {
-      return;
-    }
-
-    // 关键：如果大小变化，先清除渲染再 resize
+    // 强制完整重新渲染
     if (
       this._terminal.rows !== dims.rows ||
       this._terminal.cols !== dims.cols
@@ -64,19 +68,14 @@ export class FitAddon implements ITerminalAddon {
 
     const core = (this._terminal as any)._core;
 
-    if (!core || !core._renderService) {
+    if (!core._renderService) {
       return undefined;
     }
 
-    const dims = core._renderService.dimensions;
+    const dims: IRenderDimensions = core._renderService.dimensions;
 
-    if (
-      !dims ||
-      !dims.css ||
-      !dims.css.cell ||
-      dims.css.cell.width === 0 ||
-      dims.css.cell.height === 0
-    ) {
+    // 检查字体是否已加载
+    if (dims.css.cell.width === 0 || dims.css.cell.height === 0) {
       return undefined;
     }
 
@@ -97,34 +96,38 @@ export class FitAddon implements ITerminalAddon {
       scrollbarWidth = 0;
     }
 
-    // Use getBoundingClientRect for more accurate measurement including fractional pixels
-    const parentRect =
-      this._terminal.element.parentElement.getBoundingClientRect();
-    const parentElementHeight = parentRect.height;
-    const parentElementWidth = parentRect.width;
+    const parentElementStyle = window.getComputedStyle(
+      this._terminal.element.parentElement,
+    );
+    const parentElementHeight = parseInt(
+      parentElementStyle.getPropertyValue("height"),
+    );
+    const parentElementWidth = Math.max(
+      0,
+      parseInt(parentElementStyle.getPropertyValue("width")),
+    );
 
-    console.log("[FitAddon Debug] Measuring parent (Rect):", {
-      width: parentElementWidth,
-      height: parentElementHeight,
-      top: parentRect.top,
-      bottom: parentRect.bottom,
-    });
+    // 安全检查：如果父元素高度为 0 或 NaN，说明布局还没完成
+    if (
+      !parentElementHeight ||
+      parentElementHeight <= 0 ||
+      isNaN(parentElementHeight)
+    ) {
+      return undefined;
+    }
 
     const elementStyle = window.getComputedStyle(this._terminal.element);
     const elementPadding = {
-      top: parseInt(elementStyle.getPropertyValue("padding-top")) || 0,
-      bottom: parseInt(elementStyle.getPropertyValue("padding-bottom")) || 0,
-      right: parseInt(elementStyle.getPropertyValue("padding-right")) || 0,
-      left: parseInt(elementStyle.getPropertyValue("padding-left")) || 0,
+      top: parseInt(elementStyle.getPropertyValue("padding-top")),
+      bottom: parseInt(elementStyle.getPropertyValue("padding-bottom")),
+      right: parseInt(elementStyle.getPropertyValue("padding-right")),
+      left: parseInt(elementStyle.getPropertyValue("padding-left")),
     };
-
     const elementPaddingVer = elementPadding.top + elementPadding.bottom;
     const elementPaddingHor = elementPadding.right + elementPadding.left;
-
     const availableHeight = parentElementHeight - elementPaddingVer;
     const availableWidth =
       parentElementWidth - elementPaddingHor - scrollbarWidth;
-
     const geometry = {
       cols: Math.max(
         MINIMUM_COLS,
@@ -135,17 +138,6 @@ export class FitAddon implements ITerminalAddon {
         Math.floor(availableHeight / dims.css.cell.height),
       ),
     };
-
-    console.log("[FitAddon] proposeDimensions:", {
-      parentElementHeight,
-      parentElementWidth,
-      availableHeight,
-      availableWidth,
-      cellHeight: dims.css.cell.height,
-      cellWidth: dims.css.cell.width,
-      geometry,
-    });
-
     return geometry;
   }
 }

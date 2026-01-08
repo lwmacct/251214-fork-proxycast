@@ -4,6 +4,8 @@
  * @module lib/terminal/themes
  *
  * 提供多种终端主题，参考 waveterm 的主题系统。
+ *
+ * _Requirements: 8.7, 8.8, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
  */
 
 import type { ITheme } from "@xterm/xterm";
@@ -301,8 +303,18 @@ export function getThemeList(): TerminalTheme[] {
 
 /** 主题存储键 */
 const THEME_STORAGE_KEY = "terminal-theme";
+/** 字体大小存储键 */
+const FONT_SIZE_STORAGE_KEY = "terminal-font-size";
+/** 默认字体大小 */
+export const DEFAULT_FONT_SIZE = 14;
+/** 最小字体大小 */
+export const MIN_FONT_SIZE = 8;
+/** 最大字体大小 */
+export const MAX_FONT_SIZE = 32;
 
-/** 保存主题到本地存储 */
+/** 保存主题到本地存储
+ * _Requirements: 12.4_
+ */
 export function saveThemePreference(name: ThemeName): void {
   localStorage.setItem(THEME_STORAGE_KEY, name);
 }
@@ -314,4 +326,49 @@ export function loadThemePreference(): ThemeName {
     return saved as ThemeName;
   }
   return DEFAULT_THEME;
+}
+
+/** 保存字体大小到本地存储
+ * _Requirements: 8.8_
+ */
+export function saveFontSizePreference(size: number): void {
+  const clampedSize = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size));
+  localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(clampedSize));
+}
+
+/** 从本地存储加载字体大小 */
+export function loadFontSizePreference(): number {
+  const saved = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+  if (saved) {
+    const size = parseInt(saved, 10);
+    if (!isNaN(size) && size >= MIN_FONT_SIZE && size <= MAX_FONT_SIZE) {
+      return size;
+    }
+  }
+  return DEFAULT_FONT_SIZE;
+}
+
+/** 应用透明度到主题
+ * _Requirements: 12.3_
+ */
+export function applyThemeOpacity(theme: ITheme, opacity: number): ITheme {
+  if (opacity >= 1) return theme;
+
+  // 将背景色转换为带透明度的颜色
+  const bgColor = theme.background || "#000000";
+  const alpha = Math.max(0, Math.min(1, opacity));
+
+  // 如果是 hex 颜色，转换为 rgba
+  if (bgColor.startsWith("#")) {
+    const hex = bgColor.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return {
+      ...theme,
+      background: `rgba(${r}, ${g}, ${b}, ${alpha})`,
+    };
+  }
+
+  return theme;
 }

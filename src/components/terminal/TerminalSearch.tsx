@@ -5,10 +5,20 @@
  *
  * 提供终端内搜索功能的 UI 组件。
  * 支持正则表达式、大小写敏感、全词匹配等选项。
+ *
+ * _Requirements: 8.3, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7_
  */
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import type { ISearchOptions } from "@xterm/addon-search";
+
+/** 搜索结果信息 */
+export interface SearchResultInfo {
+  /** 当前匹配索引（从 1 开始） */
+  currentIndex: number;
+  /** 总匹配数 */
+  totalCount: number;
+}
 
 /** 搜索组件属性 */
 export interface TerminalSearchProps {
@@ -16,14 +26,18 @@ export interface TerminalSearchProps {
   visible: boolean;
   /** 关闭回调 */
   onClose: () => void;
-  /** 搜索回调 */
+  /** 搜索回调，返回是否找到匹配 */
   onSearch: (term: string, options: ISearchOptions) => boolean;
-  /** 搜索下一个 */
+  /** 搜索下一个，返回是否找到匹配 */
   onSearchNext: (term: string, options: ISearchOptions) => boolean;
-  /** 搜索上一个 */
+  /** 搜索上一个，返回是否找到匹配 */
   onSearchPrevious: (term: string, options: ISearchOptions) => boolean;
   /** 清除搜索 */
   onClearSearch: () => void;
+  /** 搜索结果信息（可选，用于显示匹配计数）
+   * _Requirements: 11.4, 11.5_
+   */
+  searchResultInfo?: SearchResultInfo;
 }
 
 /** 搜索图标 */
@@ -90,6 +104,8 @@ const ChevronDownIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 /**
  * 终端搜索组件
+ *
+ * _Requirements: 8.3, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7_
  */
 export const TerminalSearch: React.FC<TerminalSearchProps> = ({
   visible,
@@ -98,10 +114,17 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
   onSearchNext,
   onSearchPrevious,
   onClearSearch,
+  searchResultInfo,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  // 区分大小写选项
+  // _Requirements: 11.2_
   const [caseSensitive, setCaseSensitive] = useState(false);
+  // 全词匹配选项
+  // _Requirements: 11.3_
   const [wholeWord, setWholeWord] = useState(false);
+  // 正则表达式选项
+  // _Requirements: 11.1_
   const [regex, setRegex] = useState(false);
   const [hasResults, setHasResults] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +136,16 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
       wholeWord,
       regex,
       incremental: true,
+      // 启用装饰器以高亮所有匹配项
+      // _Requirements: 11.4_
+      decorations: {
+        matchBackground: "#7aa2f7",
+        matchBorder: "#7aa2f7",
+        matchOverviewRuler: "#7aa2f7",
+        activeMatchBackground: "#ff9e64",
+        activeMatchBorder: "#ff9e64",
+        activeMatchColorOverviewRuler: "#ff9e64",
+      },
     }),
     [caseSensitive, wholeWord, regex],
   );
@@ -129,6 +162,7 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
   }, [searchTerm, getSearchOptions, onSearch, onClearSearch]);
 
   // 搜索下一个
+  // _Requirements: 11.6_
   const handleNext = useCallback(() => {
     if (!searchTerm) return;
     const found = onSearchNext(searchTerm, getSearchOptions());
@@ -136,6 +170,7 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
   }, [searchTerm, getSearchOptions, onSearchNext]);
 
   // 搜索上一个
+  // _Requirements: 11.6_
   const handlePrevious = useCallback(() => {
     if (!searchTerm) return;
     const found = onSearchPrevious(searchTerm, getSearchOptions());
@@ -143,6 +178,7 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
   }, [searchTerm, getSearchOptions, onSearchPrevious]);
 
   // 关闭搜索
+  // _Requirements: 11.7_
   const handleClose = useCallback(() => {
     onClearSearch();
     setSearchTerm("");
@@ -161,6 +197,21 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
         } else {
           handleNext();
         }
+      }
+      // Alt+C 切换大小写敏感
+      if (e.altKey && e.key === "c") {
+        e.preventDefault();
+        setCaseSensitive((prev) => !prev);
+      }
+      // Alt+W 切换全词匹配
+      if (e.altKey && e.key === "w") {
+        e.preventDefault();
+        setWholeWord((prev) => !prev);
+      }
+      // Alt+R 切换正则表达式
+      if (e.altKey && e.key === "r") {
+        e.preventDefault();
+        setRegex((prev) => !prev);
       }
     },
     [handleClose, handleNext, handlePrevious],
@@ -181,6 +232,26 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
 
   if (!visible) return null;
 
+  // 渲染搜索结果计数
+  // _Requirements: 11.5_
+  const renderResultCount = () => {
+    if (!searchTerm) return null;
+
+    if (hasResults === false) {
+      return <span className="terminal-search-no-results">无结果</span>;
+    }
+
+    if (searchResultInfo && searchResultInfo.totalCount > 0) {
+      return (
+        <span className="terminal-search-count">
+          {searchResultInfo.currentIndex} / {searchResultInfo.totalCount}
+        </span>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="terminal-search-bar">
       <div className="terminal-search-input-wrapper">
@@ -194,12 +265,12 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {searchTerm && hasResults === false && (
-          <span className="terminal-search-no-results">无结果</span>
-        )}
+        {renderResultCount()}
       </div>
 
-      {/* 搜索选项 */}
+      {/* 搜索选项
+       * _Requirements: 11.1, 11.2, 11.3_
+       */}
       <div className="terminal-search-options">
         <button
           className={`terminal-search-option ${caseSensitive ? "active" : ""}`}
@@ -224,12 +295,14 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
         </button>
       </div>
 
-      {/* 导航按钮 */}
+      {/* 导航按钮
+       * _Requirements: 11.6_
+       */}
       <div className="terminal-search-nav">
         <button
           className="terminal-search-nav-btn"
           onClick={handlePrevious}
-          disabled={!searchTerm}
+          disabled={!searchTerm || hasResults === false}
           title="上一个 (Shift+Enter)"
         >
           <ChevronUpIcon />
@@ -237,14 +310,16 @@ export const TerminalSearch: React.FC<TerminalSearchProps> = ({
         <button
           className="terminal-search-nav-btn"
           onClick={handleNext}
-          disabled={!searchTerm}
+          disabled={!searchTerm || hasResults === false}
           title="下一个 (Enter)"
         >
           <ChevronDownIcon />
         </button>
       </div>
 
-      {/* 关闭按钮 */}
+      {/* 关闭按钮
+       * _Requirements: 11.7_
+       */}
       <button
         className="terminal-search-close"
         onClick={handleClose}

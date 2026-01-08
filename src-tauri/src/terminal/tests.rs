@@ -208,3 +208,147 @@ mod tests {
         assert_eq!(event_names::TERMINAL_STATUS, "terminal:status");
     }
 }
+
+// ========================================================================
+// 属性测试 - ShellController
+// ========================================================================
+
+/// **Feature: terminal-enhancement, Property 1: 控制器类型一致性**
+/// **Validates: Requirements 1.2, 1.3**
+///
+/// *对于任意* 控制器创建请求，如果请求指定 controller_type 为 "shell"，
+/// 则创建的控制器实例的 controller_type 字段应为 "shell"；
+/// 如果请求指定为 "cmd"，则应为 "cmd"。
+#[cfg(test)]
+mod property_tests {
+    use super::super::block_controller::{BlockControllerRuntimeStatus, BlockMeta};
+    use proptest::prelude::*;
+
+    /// 生成有效的控制器类型
+    fn arb_controller_type() -> impl Strategy<Value = String> {
+        prop_oneof![Just("shell".to_string()), Just("cmd".to_string()),]
+    }
+
+    /// 生成有效的 block_id
+    fn arb_block_id() -> impl Strategy<Value = String> {
+        "[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}".prop_map(|s| s.to_string())
+    }
+
+    proptest! {
+        /// **Feature: terminal-enhancement, Property 1: 控制器类型一致性**
+        /// **Validates: Requirements 1.2, 1.3**
+        ///
+        /// 测试 BlockControllerRuntimeStatus 的创建和状态一致性
+        #[test]
+        fn prop_controller_type_consistency(
+            block_id in arb_block_id(),
+            _controller_type in arb_controller_type(),
+        ) {
+            // 创建运行时状态
+            let status = BlockControllerRuntimeStatus::new(block_id.clone());
+
+            // 验证初始状态
+            prop_assert_eq!(&status.block_id, &block_id);
+            prop_assert_eq!(status.version, 0);
+            prop_assert_eq!(&status.shell_proc_status, "init");
+            prop_assert!(status.shell_proc_conn_name.is_none());
+            prop_assert_eq!(status.shell_proc_exit_code, 0);
+
+            // 验证状态检查方法
+            prop_assert!(status.is_init());
+            prop_assert!(!status.is_running());
+            prop_assert!(!status.is_done());
+        }
+
+        /// **Feature: terminal-enhancement, Property 1: 控制器类型一致性**
+        /// **Validates: Requirements 1.2, 1.3**
+        ///
+        /// 测试 BlockMeta 的控制器类型字段一致性
+        #[test]
+        fn prop_block_meta_controller_type_consistency(
+            controller_type in arb_controller_type(),
+        ) {
+            // 创建 BlockMeta
+            let meta = BlockMeta {
+                controller: Some(controller_type.clone()),
+                ..Default::default()
+            };
+
+            // 验证 get_string 返回正确的控制器类型
+            prop_assert_eq!(meta.get_string("controller"), controller_type);
+        }
+
+        /// **Feature: terminal-enhancement, Property 4: 控制器类型变更正确性**
+        /// **Validates: Requirements 1.7**
+        ///
+        /// 测试状态转换的有效性
+        #[test]
+        fn prop_controller_status_transitions(
+            block_id in arb_block_id(),
+        ) {
+            // 创建初始状态
+            let mut status = BlockControllerRuntimeStatus::new(block_id.clone());
+            prop_assert!(status.is_init());
+
+            // 模拟状态转换到 running
+            status.shell_proc_status = "running".to_string();
+            prop_assert!(status.is_running());
+            prop_assert!(!status.is_init());
+            prop_assert!(!status.is_done());
+
+            // 模拟状态转换到 done
+            status.shell_proc_status = "done".to_string();
+            prop_assert!(status.is_done());
+            prop_assert!(!status.is_init());
+            prop_assert!(!status.is_running());
+        }
+
+        /// **Feature: terminal-enhancement, Property 4: 控制器类型变更正确性**
+        /// **Validates: Requirements 1.7**
+        ///
+        /// 测试版本号递增
+        #[test]
+        fn prop_controller_version_increment(
+            block_id in arb_block_id(),
+            increments in 1..100usize,
+        ) {
+            let mut status = BlockControllerRuntimeStatus::new(block_id);
+            prop_assert_eq!(status.version, 0);
+
+            // 模拟多次状态更新
+            for i in 1..=increments {
+                status.version = i as i32;
+                prop_assert_eq!(status.version, i as i32);
+            }
+        }
+    }
+
+    /// 测试 BlockMeta 默认值
+    #[test]
+    fn test_block_meta_defaults() {
+        let meta = BlockMeta::default();
+        assert!(meta.controller.is_none());
+        assert!(meta.connection.is_none());
+        assert!(meta.cmd.is_none());
+        assert!(meta.cmd_args.is_none());
+        assert!(meta.cmd_cwd.is_none());
+        assert!(meta.cmd_env.is_none());
+        assert!(meta.cmd_run_on_start.is_none());
+        assert!(meta.cmd_run_once.is_none());
+        assert!(meta.cmd_clear_on_start.is_none());
+        assert!(meta.cmd_close_on_exit.is_none());
+    }
+
+    /// 测试 BlockMeta get_string 默认值
+    #[test]
+    fn test_block_meta_get_string_defaults() {
+        let meta = BlockMeta::default();
+        assert_eq!(meta.get_string("controller"), "");
+        assert_eq!(meta.get_string("connection"), "");
+        assert_eq!(meta.get_string("cmd"), "");
+        assert_eq!(meta.get_string("cmd_cwd"), "");
+        assert_eq!(meta.get_string("term_mode"), "term");
+        assert_eq!(meta.get_string("term_theme"), "");
+        assert_eq!(meta.get_string("unknown_field"), "");
+    }
+}

@@ -5,6 +5,8 @@
 //! ## 功能
 //! - 会话管理错误
 //! - PTY 操作错误
+//! - 块文件存储错误
+//! - 数据库错误
 //! - 序列化支持
 
 use thiserror::Error;
@@ -36,9 +38,53 @@ pub enum TerminalError {
     #[error("Base64 解码失败: {0}")]
     Base64DecodeFailed(String),
 
+    /// 块文件错误
+    #[error("块文件错误: {0}")]
+    BlockFileError(String),
+
+    /// 数据库错误
+    #[error("数据库错误: {0}")]
+    DatabaseError(String),
+
+    /// 控制器未找到
+    #[error("控制器未找到: {0}")]
+    ControllerNotFound(String),
+
+    /// SSH 连接失败
+    #[error("SSH 连接失败: {0}")]
+    SSHConnectionFailed(String),
+
+    /// SSH 认证失败
+    #[error("SSH 认证失败: {0}")]
+    SSHAuthFailed(String),
+
+    /// WSL 连接失败
+    #[error("WSL 连接失败: {0}")]
+    WSLConnectionFailed(String),
+
+    /// 无效的 OSC 序列
+    #[error("无效的 OSC 序列: {0}")]
+    InvalidOSCSequence(String),
+
+    /// 连接超时
+    #[error("连接超时")]
+    ConnectionTimeout,
+
+    /// 用户取消
+    #[error("用户取消")]
+    UserCancelled,
+
+    /// 主机密钥验证失败
+    #[error("主机密钥验证失败: {0}")]
+    HostKeyVerificationFailed(String),
+
     /// 内部错误
     #[error("内部错误: {0}")]
     Internal(String),
+
+    /// 无效的连接类型
+    #[error("无效的连接类型: {0}")]
+    InvalidConnectionType(String),
 }
 
 impl From<TerminalError> for String {

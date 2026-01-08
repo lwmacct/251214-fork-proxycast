@@ -5,8 +5,13 @@
 //! ## 事件列表
 //! - `terminal:output` - 终端输出数据
 //! - `terminal:status` - 终端状态变化
+//! - `terminal:shell-integration` - Shell 集成状态变化
+//! - `terminal:clipboard-write` - 剪贴板写入请求
+//! - `terminal:conn-change` - 连接状态变化
 
 use serde::{Deserialize, Serialize};
+
+use crate::terminal::connections::ConnStatus;
 
 /// 会话状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,10 +59,29 @@ pub struct TerminalStatusEvent {
     pub error: Option<String>,
 }
 
+/// 连接状态变更事件
+///
+/// Event name: `terminal:conn-change`
+///
+/// _Requirements: 7.3_
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnChangeEvent {
+    /// 连接名称
+    pub connection: String,
+    /// 连接状态详情
+    pub status: ConnStatus,
+}
+
 /// 事件名称常量
 pub mod event_names {
     /// 终端输出事件名
     pub const TERMINAL_OUTPUT: &str = "terminal:output";
     /// 终端状态事件名
     pub const TERMINAL_STATUS: &str = "terminal:status";
+    /// Shell 集成状态事件名
+    pub const SHELL_INTEGRATION_STATUS: &str = "terminal:shell-integration";
+    /// 剪贴板写入事件名
+    pub const CLIPBOARD_WRITE: &str = "terminal:clipboard-write";
+    /// 连接状态变更事件名
+    pub const CONN_CHANGE: &str = "terminal:conn-change";
 }

@@ -767,6 +767,8 @@ pub fn run() {
             commands::plugin_install_cmd::is_plugin_installed,
             // Plugin UI commands
             commands::plugin_cmd::get_plugins_with_ui,
+            commands::plugin_cmd::read_plugin_manifest_cmd,
+            commands::plugin_cmd::launch_plugin_ui,
             // Plugin RPC commands
             commands::plugin_rpc_cmd::plugin_rpc_connect,
             commands::plugin_rpc_cmd::plugin_rpc_disconnect,

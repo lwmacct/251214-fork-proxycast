@@ -19,6 +19,7 @@ import { ToolsPage } from "./components/tools/ToolsPage";
 import { AgentChatPage } from "./components/agent";
 import { PluginUIRenderer } from "./components/plugins/PluginUIRenderer";
 import { PluginsPage } from "./components/plugins/PluginsPage";
+import { TerminalPage } from "./components/terminal/TerminalPage";
 import { flowEventManager } from "./lib/flowEventManager";
 import { OnboardingWizard, useOnboardingState } from "./components/onboarding";
 import { ConnectConfirmDialog } from "./components/connect";
@@ -42,6 +43,7 @@ type Page =
   | "tools"
   | "plugins"
   | "settings"
+  | "terminal"
   | `plugin:${string}`;
 
 const AppContainer = styled.div`
@@ -182,6 +184,13 @@ function App() {
         // Agent 页面有自己的布局，不需要 PageWrapper
         return (
           <AgentChatPage onNavigate={(page) => setCurrentPage(page as Page)} />
+        );
+      case "terminal":
+        // 终端页面需要全屏显示
+        return (
+          <FullscreenWrapper>
+            <TerminalPage />
+          </FullscreenWrapper>
         );
       case "tools":
         return (
