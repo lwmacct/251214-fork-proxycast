@@ -38,6 +38,8 @@ mod commands;
 mod config;
 mod converter;
 mod data;
+#[cfg(debug_assertions)]
+mod dev_bridge;
 mod logger;
 mod models;
 mod providers;

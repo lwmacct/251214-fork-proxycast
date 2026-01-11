@@ -986,6 +986,9 @@ async fn run_server(
         .merge(kiro_api_routes)
         // 凭证 API 路由（用于 aster Agent 集成）
         .merge(credentials_api_routes)
+        // 开发模式 HTTP 桥接路由（仅在 debug 模式启用）
+        // 允许浏览器 dev server 通过 HTTP 调用 Tauri 命令
+        .merge(crate::dev_bridge::dev_bridge_routes())
         .layer(DefaultBodyLimit::max(body_limit))
         .with_state(state);
 
