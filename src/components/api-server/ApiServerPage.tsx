@@ -527,8 +527,27 @@ export function ApiServerPage() {
   const serverUrl = getTestUrl(currentHost, currentPort);
   const apiKey = config?.server.api_key ?? "";
 
+  // 获取当前选中 Provider 的自定义模型列表
+  const getCurrentProviderCustomModels = (): string[] => {
+    // 先从 API Key Provider 中查找
+    const apiKeyProvider = apiKeyProviders.find(
+      (p) => p.id === defaultProvider && p.enabled
+    );
+    if (apiKeyProvider?.custom_models && apiKeyProvider.custom_models.length > 0) {
+      return apiKeyProvider.custom_models;
+    }
+    return [];
+  };
+
   // 根据 Provider 类型获取测试模型
   const getTestModel = (provider: string): string => {
+    // 优先使用自定义模型列表中的第一个模型
+    const customModels = getCurrentProviderCustomModels();
+    if (customModels.length > 0) {
+      return customModels[0];
+    }
+
+    // 否则使用默认模型
     switch (provider) {
       case "antigravity":
         return "gemini-3-pro-preview";
@@ -542,6 +561,8 @@ export function ApiServerPage() {
         return "claude-sonnet-4-20250514";
       case "deepseek":
         return "deepseek-chat";
+      case "zhipu":
+        return "glm-4";
       case "kiro":
       default:
         return "claude-opus-4-5-20251101";
@@ -549,6 +570,7 @@ export function ApiServerPage() {
   };
 
   const testModel = getTestModel(defaultProvider);
+  const customModels = getCurrentProviderCustomModels();
 
   // 根据 Provider 类型获取 Gemini 测试模型列表
   const getGeminiTestModels = (provider: string): string[] => {
@@ -593,7 +615,7 @@ export function ApiServerPage() {
     },
     {
       id: "chat",
-      name: "OpenAI Chat",
+      name: `OpenAI Chat (${testModel})`,
       method: "POST",
       path: "/v1/chat/completions",
       needsAuth: true,
@@ -602,9 +624,23 @@ export function ApiServerPage() {
         messages: [{ role: "user", content: "Say hi in one word" }],
       }),
     },
+    // 为自定义模型列表中的其他模型生成测试端点
+    ...(customModels.length > 1
+      ? customModels.slice(1).map((model, index) => ({
+          id: `custom-model-${index}`,
+          name: `OpenAI Chat (${model})`,
+          method: "POST",
+          path: "/v1/chat/completions",
+          needsAuth: true,
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: "user", content: "Say hi in one word" }],
+          }),
+        }))
+      : []),
     {
       id: "anthropic",
-      name: "Anthropic Messages",
+      name: `Anthropic Messages (${testModel})`,
       method: "POST",
       path: "/v1/messages",
       needsAuth: true,

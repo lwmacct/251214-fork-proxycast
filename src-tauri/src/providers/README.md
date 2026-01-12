@@ -1,11 +1,3 @@
-<!--
- * @Author: Chiron 598621670@qq.com
- * @Date: 2026-01-06 17:34:03
- * @LastEditors: Chiron 598621670@qq.com
- * @LastEditTime: 2026-01-11 01:09:49
- * @FilePath: /proxycast/src-tauri/src/providers/README.md
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
--->
 # providers
 
 <!-- 一旦我所属的文件夹有所变化，请更新我 -->
